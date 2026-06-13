@@ -1104,7 +1104,7 @@ function P30_Chat() {
     if (c.type === 'anchor') return [
       { from:'agent', t:'好，和我讲讲「' + c.name + '」。给我一个画面 —— 哪一年、哪个地方，第一口下去什么味？' }
     ];
-    return [{ from:'agent', t:'我在呢。想讲哪种味道？可以就是一个局駁不安的画面，也可以是一句“那道菜我还记得”。' }];
+    return [{ from:'agent', t:'我在呢。想讲哪种味道？可以就是一个模糊的画面，也可以是一句“那道菜我还记得”。' }];
   };
   const [msgs, setMsgs] = React.useState(initMsgs);
   const [input, setInput] = React.useState('');
@@ -2182,7 +2182,7 @@ function P40_Feed() {
           <div style={{ width:38, height:38, borderRadius:'50%', background:C.warnBg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>✋</div>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:13, color:C.t1, fontWeight:600, lineHeight:1.55 }}>爷爷还没回应你报出的「腊肠」钩子</div>
-            <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>上次报出所 3 天了</div>
+            <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>上次抛出已 3 天了</div>
           </div>
           <button onClick={()=>{ setSheet('poke'); }} style={{ height:32, padding:'0 12px', borderRadius:9999, background:C.primary, color:'#fff', border:'none', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>戳一下</button>
         </div>
@@ -2259,7 +2259,7 @@ function P40_Feed() {
 
       <BottomSheet open={sheet==='poke'} onClose={()=>setSheet(null)} title="戳一下提醒">
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <div style={{ fontSize:13, color:C.t2, lineHeight:1.8 }}>选一种不勿打扰的方式轻推一下</div>
+          <div style={{ fontSize:13, color:C.t2, lineHeight:1.8 }}>选一种不打扰的方式轻推一下</div>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {['发个「他在听吗」提醒'].map(p=>(
               <button key={p} onClick={()=>{ setSheet(null); showToast('已发送'); }} style={{ padding:'14px 16px', background:'#FFFDF8', border:`1px solid ${C.border}`, borderRadius:12, textAlign:'left', cursor:'pointer', fontFamily:'inherit', fontSize:14, color:C.t1 }}>{p}</button>
@@ -3007,7 +3007,7 @@ function P61_Book() {
           <img src={FOOD_POOL[7]} alt="" style={{ width:96, height:96, objectFit:'contain', animation:'spin 3.6s linear infinite' }}/>
           <div style={{ textAlign:'center' }}>
             <div style={{ fontSize:16, fontWeight:700, color:C.t1, fontFamily:'"Noto Serif SC",serif', letterSpacing:2 }}>正在装订你们的记忆…</div>
-            <div style={{ fontSize:12, color:C.t3, marginTop:10, lineHeight:1.8 }}>排版 · 掌纹 · 重同</div>
+            <div style={{ fontSize:12, color:C.t3, marginTop:10, lineHeight:1.8 }}>排版 · 装帧 · 校对</div>
           </div>
           <div style={{ width:200, height:3, background:C.border, borderRadius:9999, overflow:'hidden' }}>
             <div style={{ width:'72%', height:'100%', background:C.primary }}/>
@@ -3036,7 +3036,7 @@ function P61_Book() {
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {[
             { t:'导出 PDF', s:'保存到本机，可发打印店' },
-            { t:'导出图册', s:'项项独立 PNG，适合发朝友圈' },
+            { t:'导出图册', s:'每页独立 PNG，适合发朋友圈' },
             { t:'系统分享', s:'发给微信 / AirDrop' },
           ].map(o=>(
             <button key={o.t} onClick={()=>{ setSheet(null); showToast(`${o.t} · 已处理`); }} style={{ padding:'14px 14px', background:'#FFFDF8', border:`1px solid ${C.border}`, borderRadius:12, textAlign:'left', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:10 }}>
@@ -3098,7 +3098,7 @@ function P62_Capsule() {
   const [form, setForm] = React.useState({ name:'', whenY:'2030', whenM:'1', whenD:'1', to:'女儿·陈小豆', items:[] });
   const CAPS = [
     { id:'c1', name:'给女儿十八岁的老味道', to:'女儿·陈小豆', open:'2030年9月12日', days:1572, state:'sealed', img:MOCK_FOOD_IMG },
-    { id:'c2', name:'给妇妇的三代菜谱', to:'妹妹·陈小雨', open:'2028年3月5日', days:632, state:'sealed', img:MOCK_FOOD_IMG },
+    { id:'c2', name:'给妹妹的三代菜谱', to:'妹妹·陈小雨', open:'2028年3月5日', days:632, state:'sealed', img:MOCK_FOOD_IMG },
     { id:'c3', name:'我留给全家的一封话', to:'全家', open:'2026年6月1日', days:0, state:'open', img:MOCK_FOOD_IMG },
   ];
   return (
@@ -3218,7 +3218,7 @@ function P62_Capsule() {
             </div>
           </div>
           <button onClick={()=>showToast('选择记忆·已选 0 件')} style={{ padding:'14px 16px', background:'transparent', border:`1.5px dashed ${C.border}`, borderRadius:10, cursor:'pointer', fontFamily:'inherit', fontSize:13, color:C.t2, textAlign:'left', display:'flex', justifyContent:'space-between' }}>
-            <span>挑选要封存的记忆</span><span style={{ color:C.t3 }}>从锰点中选 ›</span>
+            <span>挑选要封存的记忆</span><span style={{ color:C.t3 }}>从锚点中选 ›</span>
           </button>
           <Btn fullWidth size="lg" disabled={!form.name.trim()} onClick={()=>{ setSheet(null); showToast('已封存'); }}>封存</Btn>
         </div>
@@ -3624,7 +3624,7 @@ function P_JoinFamily() {
         </div>
         {codeErr && <div style={{ fontSize:12.5, color:C.red, textAlign:'center' }}>{codeErr}</div>}
         <Btn onClick={handleJoin} disabled={code.length!==6} fullWidth size="lg">验证并加入</Btn>
-        <div style={{ textAlign:'center', fontSize:13, color:C.t3 }}>没有代码？<button onClick={()=>setSheet('create')} style={{ border:'none', background:'none', cursor:'pointer', color:C.primary, fontSize:13, fontFamily:'inherit', fontWeight:600 }}>创建你自己的家族</button></div>
+        <div style={{ textAlign:'center', fontSize:13, color:C.t3 }}>没有代码？<button onClick={()=>navigate('P_CreateFamily')} style={{ border:'none', background:'none', cursor:'pointer', color:C.primary, fontSize:13, fontFamily:'inherit', fontWeight:600 }}>创建你自己的家族</button></div>
       </div>
     </div>
   );
@@ -4010,7 +4010,7 @@ function P_EditMemory() {
           <Btn fullWidth size="lg" onClick={()=>{ showToast('已保存修改'); navigate(-1); }}>保存</Btn>
           <div style={{ height:1, background:C.border, margin:'8px 0' }}/>
           {!showDelConfirm && (<button onClick={()=>setShowDelConfirm(true)} style={{ background:'transparent', border:'1px solid rgba(200,60,60,0.25)', borderRadius:12, padding:'14px', cursor:'pointer', fontFamily:'inherit', fontSize:14, color:C.red, display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%' }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke={C.red} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>删除这道记忆</button>)}
-          {showDelConfirm && (<div style={{ background:'#FFF0F0', border:'1px solid rgba(200,60,60,0.2)', borderRadius:12, padding:'14px 16px', display:'flex', flexDirection:'column', gap:12 }}><div style={{ fontSize:13.5, color:C.t2, lineHeight:1.8 }}>删除后这道记忆将从味道桃上移除。确认删除吗？</div><div style={{ display:'flex', gap:8 }}><Btn variant="outline" fullWidth onClick={()=>setShowDelConfirm(false)}>取消</Btn><Btn fullWidth onClick={()=>{ showToast('已删除'); navigate('P10'); }} xstyle={{ background:C.red }}>确认删除</Btn></div></div>)}
+          {showDelConfirm && (<div style={{ background:'#FFF0F0', border:'1px solid rgba(200,60,60,0.2)', borderRadius:12, padding:'14px 16px', display:'flex', flexDirection:'column', gap:12 }}><div style={{ fontSize:13.5, color:C.t2, lineHeight:1.8 }}>删除后这道记忆将从味道桌上移除。确认删除吗？</div><div style={{ display:'flex', gap:8 }}><Btn variant="outline" fullWidth onClick={()=>setShowDelConfirm(false)}>取消</Btn><Btn fullWidth onClick={()=>{ showToast('已删除'); navigate('P10'); }} xstyle={{ background:C.red }}>确认删除</Btn></div></div>)}
         </>)}
       </div>
     </div>
@@ -4069,7 +4069,7 @@ function PhoneApp() {
     }
   }, []);
   React.useEffect(()=>{
-    const onHash = ()=>{ const id=window.location.hash.slice(1); if(SCREENS.find(s=>s.id===id)){ setPage(id); setHistory(h=>[...h,id]); } };
+    const onHash = ()=>{ const id=window.location.hash.slice(1); if(SCREENS.find(s=>s.id===id)){ setPage(id); setHistory(h=> h[h.length-1]===id ? h : [...h,id]); } };
     window.addEventListener('hashchange', onHash);
     return ()=>window.removeEventListener('hashchange', onHash);
   }, []);
