@@ -222,6 +222,33 @@ function LocationPicker({ value, onChange, disabled, label }) {
   );
 }
 
+// ── generateTags — AI 标签生成（根据正文内容提取 4-5 个关键词）──
+function generateTags(text, extra = []) {
+  if (!text || text === '未知') return extra.length > 0 ? extra.slice(0, 5) : [];
+  const tags = new Set(extra);
+  // 匹配年份
+  const yearMatch = text.match(/\b(1[89]\d{2}|20\d{2})\b/g);
+  if (yearMatch) tags.add(yearMatch[0]);
+  // 匹配省市
+  const locMatch = text.match(/(?:江苏|浙江|广东|四川|湖北|湖南|河南|山东|河北|福建|安徽|江西|陕西|辽宁|云南|贵州|广西|山西|吉林|黑龙江|甘肃|海南|台湾|北京|上海|天津|重庆|西藏|新疆|青海|宁夏|内蒙古)(?:\s*·\s*\S+)?/);
+  if (locMatch) tags.add(locMatch[0]);
+  // 匹配食材/调料（常见关键词）
+  const foodKw = ['花椒','辣椒','姜','蒜','葱','酱油','醋','糖','盐','米酒','料酒','冰糖','五花肉','鸡肉','鸡蛋','豆腐','面粉','糯米','桂花','梅干菜','酸菜','腊肉','鱼','虾','蟹','年糕','饺子','包子','馒头','面条','米饭','汤圆','月饼','粽子','青团','红烧肉','火锅','烧烤','卤','蒸','炖','炒','炸','煎'];
+  for (const kw of foodKw) {
+    if (text.includes(kw)) tags.add(kw);
+  }
+  // 补到 4-5 个
+  const arr = [...tags];
+  if (arr.length < 4) {
+    const fallbacks = ['家常味道', '记忆中的味道', '一家人', '温暖', '小时候', '老厨房', '年夜饭'];
+    for (const f of fallbacks) {
+      if (arr.length >= 5) break;
+      if (!arr.includes(f)) arr.push(f);
+    }
+  }
+  return arr.slice(0, 5);
+}
+
 function NavBar({ title, onBack, rightEl }) {
   return (
     <div style={{ height:44, display:'flex', alignItems:'center', padding:'0 16px', gap:8, flexShrink:0 }}>
@@ -1143,18 +1170,22 @@ function P30_Chat() {
       </div>
 
       <div ref={scRef} style={{ flex:1, overflowY:'auto', padding:'10px 18px 14px', display:'flex', flexDirection:'column', gap:12, position:'relative', zIndex:1 }}>
-        {msgs.map((m,i)=> m.cta ? (
-          <button key={i} onClick={()=>navigate('P31')} style={{ alignSelf:'flex-start', background:C.primary, color:'#fff', border:'none', borderRadius:9999, padding:'10px 18px', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 4px 14px rgba(40,91,78,0.28)', display:'flex', alignItems:'center', gap:6 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 4h10l6 6v10a2 2 0 0 1-2 2H4V4Z" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/></svg>
-            整理成一段故事
-          </button>
-        ) : (
+        {msgs.filter(m=>!m.cta).map((m,i)=> (
           <div key={i} style={{ display:'flex', flexDirection:m.from==='user'?'row-reverse':'row', gap:8, alignItems:'flex-end' }}>
             {m.from==='agent' && <div style={{ width:26, height:26, borderRadius:'50%', background:C.primaryPale, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3a7 7 0 0 1 7 7v3l1.5 3-2 .5L18 19a6 6 0 0 1-6 4 6 6 0 0 1-6-4l-.5-2.5-2-.5L5 13v-3a7 7 0 0 1 7-7Z" stroke={C.primary} strokeWidth="1.6" strokeLinejoin="round"/></svg></div>}
             <div style={{ maxWidth:'78%', padding:'10px 14px', borderRadius:m.from==='user'?'16px 16px 4px 16px':'4px 16px 16px 16px', background:m.from==='user'?C.primary:'#fff', color:m.from==='user'?'#fff':C.t1, fontSize:14, lineHeight:1.7, boxShadow:'0 1px 3px rgba(0,0,0,0.05)', border:m.from==='user'?'none':`1px solid ${C.border}` }}>{m.t}</div>
           </div>
         ))}
       </div>
+
+      {msgs.some(m=>m.cta) && (
+        <div style={{ padding:'8px 18px 4px', flexShrink:0 }}>
+          <button onClick={()=>{ window.__p31ctx={ name:ctx.current.name||'', by:(ctx.current.by||''), era:(ctx.current.era||''), location:(ctx.current.location||''), img:(ctx.current.img||''), text:'', tags:[] }; sessionStorage.setItem('p31ctx',JSON.stringify(window.__p31ctx)); navigate('P31'); }} style={{ width:'100%', background:C.primary, color:'#fff', border:'none', borderRadius:9999, padding:'12px 18px', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 4px 14px rgba(40,91,78,0.28)', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 4h10l6 6v10a2 2 0 0 1-2 2H4V4Z" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/></svg>
+            整理成一段故事
+          </button>
+        </div>
+      )}
 
       <div style={{ padding:'10px 14px calc(34px + env(safe-area-inset-bottom))', background:'#FFFDF8', borderTop:`1px solid ${C.border}`, display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
         <button onClick={()=>showToast('附加图片')} style={{ width:38, height:38, borderRadius:'50%', border:`1px solid ${C.border}`, background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -1236,6 +1267,19 @@ function P31_Story() {
   const [supp, setSupp] = React.useState('');
   const [isCapsule, setIsCapsule] = React.useState(false);
   const [capForm, setCapForm] = React.useState({ name:'', whenY:'2030', whenM:'1', whenD:'1', to:['全家'] });
+
+  // ── 从 P30 上下文读取数据，应用兜底默认值 ──
+  const p30ctx = JSON.parse(sessionStorage.getItem('p31ctx') || sessionStorage.getItem('p30ctx') || '{}');
+  const storyData = {
+    name: (p30ctx.name || '') || '未知',
+    img: (p30ctx.img || '') || MOCK_FOOD_IMG,
+    by: (p30ctx.by || ''),
+    era: (p30ctx.era || '') || '1900',
+    location: (p30ctx.location || '') || '未知',
+    text: (p30ctx.text || '') || '未知',
+    tags: (p30ctx.tags && p30ctx.tags.length > 0) ? p30ctx.tags : generateTags(p30ctx.text || ''),
+  };
+
   React.useEffect(()=>{ const t=setTimeout(()=>setGen(false), 2200); return ()=>clearTimeout(t); }, []);
 
   return (
@@ -1261,20 +1305,20 @@ function P31_Story() {
               <img src={MOCK_FOOD_IMG} alt="" style={{ width:96, height:72, objectFit:'cover', borderRadius:10, flexShrink:0 }}/>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:11, color:C.t3, letterSpacing:1.5, fontWeight:600, marginBottom:4 }}>一种味道 · 一段记忆</div>
-                <div style={{ fontSize:22, fontWeight:800, color:C.t1, fontFamily:'"Noto Serif SC",serif', lineHeight:1.3 }}>外婆的辣子鸡</div>
-                <div style={{ fontSize:11.5, color:C.t3, marginTop:5 }}>外婆 · 陈秀英 · 1998 · 江苏 · 扬州</div>
+                <div style={{ fontSize:22, fontWeight:800, color:C.t1, fontFamily:'"Noto Serif SC",serif', lineHeight:1.3 }}>{storyData.name}</div>
+                <div style={{ fontSize:11.5, color:C.t3, marginTop:5 }}>{[storyData.by, storyData.era, storyData.location].filter(Boolean).join(' · ')}</div>
               </div>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:12, fontSize:14, color:C.t1, lineHeight:1.95, fontFamily:'"Noto Serif SC",serif' }}>
-              <p style={{ margin:0 }}>　　1998 年的夏天，老厨房的灶台上一直冒着油烟。外婆穿着那件洗得发白的蓝围裙，背对着我，手里的菜刀一下一下地剁着辣椒。</p>
-              <p style={{ margin:0 }}>　　她没回头，只说：「小囡，辣不辣，辣的是命，不辣的是日子。」那时候我听不太懂，只记得她说话的声音和锅里「嗤啦」一下的声音叠在一起。</p>
-              <p style={{ margin:0 }}>　　第一口鸡肉下去，舌头先麻，再热，最后是甜的 —— 那是花椒和辣椒走过之后，米酒和糖留下的尾巴。</p>
+              <p style={{ margin:0 }}>{storyData.text}</p>
             </div>
+            {storyData.tags.length > 0 && (
             <div style={{ marginTop:14, display:'flex', flexWrap:'wrap', gap:6 }}>
-              {['1998','江苏·扬州','花椒','蓝围裙'].map(tag=>(
+              {storyData.tags.map(tag=>(
                 <span key={tag} style={{ fontSize:11, background:C.primaryPale, color:C.primary, padding:'3px 9px', borderRadius:9999, fontWeight:500 }}>#{tag}</span>
               ))}
             </div>
+            )}
           </div>
 
           <div style={{ background:'#FFFDF8', borderRadius:14, padding:'14px 16px', border:`1px solid ${C.border}` }}>
@@ -1333,7 +1377,7 @@ function P31_Story() {
 
       {!gen && (
         <div style={{ padding:'12px 18px calc(34px + env(safe-area-inset-bottom))', borderTop:`1px solid ${C.border}`, background:'#FFFDF8', flexShrink:0 }}>
-          <Btn fullWidth size="lg" onClick={()=>{ if(isCapsule&&!capForm.name.trim()){ showToast('请先填写胶囊名字'); return; } if(isCapsule){ window.__capsuleCtx={ id:'new_'+Date.now(), name:capForm.name, to:capForm.to.join('、'), open:capForm.whenY+'年'+capForm.whenM+'月'+capForm.whenD+'日', days:365, count:1, img:null }; showToast('已封存并点亮'); setTimeout(()=>navigate('P_CapsuleDetail'),900); } else { showToast('已点亮这道味道'); setTimeout(()=>navigate('P11'),900); } }}>
+          <Btn fullWidth size="lg" onClick={()=>{ if(isCapsule&&!capForm.name.trim()){ showToast('请先填写胶囊名字'); return; } if(isCapsule){ window.__capsuleCtx={ id:'new_'+Date.now(), name:capForm.name, to:capForm.to.join('、'), open:capForm.whenY+'年'+capForm.whenM+'月'+capForm.whenD+'日', days:365, count:1, img:null }; showToast('已封存并点亮'); setTimeout(()=>navigate('P_CapsuleDetail'),900); } else { window.__p11ctx={ id:'new_'+Date.now(), name:storyData.name, by:storyData.by, era:storyData.era, location:storyData.location, isOwner:true }; showToast('已点亮这道味道'); setTimeout(()=>navigate('P11'),900); } }}>
             <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
               {isCapsule ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="3" stroke="#fff" strokeWidth="1.6"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/></svg> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.5 6h6l-5 4.5L17.5 19 12 15.5 6.5 19l2-6.5L3.5 8h6L12 2Z" fill="#fff"/></svg>}
               {isCapsule ? '封存并点亮' : '点亮这种味道'}
@@ -1355,7 +1399,18 @@ function P11_Anchor() {
     sessionStorage.setItem('p11ctx', JSON.stringify(window.__p11ctx));
     window.__p11ctx = null;
   }
-  const p11data = JSON.parse(sessionStorage.getItem('p11ctx') || '{"id":"a1","name":"外婆的辣子鸡","by":"外婆 · 陈秀英","era":"1998","isOwner":true,"location":"江苏 · 扬州"}');
+  const raw = JSON.parse(sessionStorage.getItem('p11ctx') || '{"id":"a1","name":"外婆的辣子鸡","by":"外婆 · 陈秀英","era":"1998","isOwner":true,"location":"江苏 · 扬州","text":"1998 年的夏天，老厨房的灶台上一直冒着油烟。外婆穿着那件洗得发白的蓝围裙，背对着我。辣不辣，辣的是命，不辣的是日子。那时候我听不太懂。"}');
+  // ── 兜底默认值 ──
+  const p11data = {
+    ...raw,
+    name: raw.name || '未知',
+    era: raw.era || '1900',
+    location: raw.location || '未知',
+    by: raw.by || '',
+    text: raw.text || '未知',
+  };
+  // ── AI 标签：根据正文内容生成 4-5 个 ──
+  const p11tags = generateTags(p11data.text, [p11data.era, p11data.location].filter(Boolean));
   const isOwnerMem = p11data.isOwner !== false;
   const [cmt, setCmt] = React.useState('');
   const [cmtEdit, setCmtEdit] = React.useState({ idx:-1, val:'' });
@@ -1414,11 +1469,10 @@ function P11_Anchor() {
         </div>
 
         <div style={{ padding:'20px 22px 16px' }}>
-          <div style={{ fontSize:24, fontWeight:800, color:C.t1, fontFamily:'"Noto Serif SC",serif', letterSpacing:1 }}>外婆的辣子鸡</div>
+          <div style={{ fontSize:24, fontWeight:800, color:C.t1, fontFamily:'"Noto Serif SC",serif', letterSpacing:1 }}>{p11data.name}</div>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:8, fontSize:12, color:C.t3 }}>
-            <span>外婆 · 陈秀英</span>
-            <span style={{ color:C.t4 }}>·</span>
-            <span>1998</span>
+            {p11data.by && <><span>{p11data.by}</span><span style={{ color:C.t4 }}>·</span></>}
+            <span>{p11data.era}</span>
             {p11data.location && <><span style={{ color:C.t4 }}>·</span><span>{p11data.location}</span></>}
           </div>
 
@@ -1427,11 +1481,13 @@ function P11_Anchor() {
             <p style={{ margin:0 }}>　　「辣不辣，辣的是命，不辣的是日子。」那时候我听不太懂。</p>
           </div>
 
+          {p11tags.length > 0 && (
           <div style={{ marginTop:14, display:'flex', flexWrap:'wrap', gap:6 }}>
-            {['1998','江苏·扬州','花椒','蓝围裙'].map(tag=>(
+            {p11tags.map(tag=>(
               <span key={tag} style={{ fontSize:11, background:C.primaryPale, color:C.primary, padding:'3px 9px', borderRadius:9999, fontWeight:500 }}>#{tag}</span>
             ))}
           </div>
+          )}
 
           {/* ── 菜谱区 ── */}
           <div style={{ marginTop:18 }}>
@@ -1591,7 +1647,7 @@ function P11_Anchor() {
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <AppInput label="吃食名" value="外婆的辣子鸡" onChange={()=>{}}/>
           <AppInput label="关联人" value="外婆 · 陈秀英" onChange={()=>{}}/>
-          <AppInput label="年代" value="1998" onChange={()=>{}}/>
+          <AppInput label="年份" value="1998" onChange={()=>{}}/>
           <div>
             <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:6 }}>记忆正文</div>
             <textarea defaultValue="1998 年的夏天，老厨房的灶台上一直冒着油烟。外婆穿着那件洗得发白的蓝围裙，背对着我。" rows={4} style={{ width:'100%', boxSizing:'border-box', border:`1.5px solid ${C.border}`, borderRadius:12, padding:'12px 14px', fontSize:13.5, color:C.t1, fontFamily:'inherit', background:'#FFFDF8', outline:'none', resize:'none', lineHeight:1.75 }}/>
@@ -3834,7 +3890,7 @@ function P_CapsuleDetail() {
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
             <div style={{ fontSize:11, color:C.t3, letterSpacing:1.5, fontWeight:600 }}>记忆正文</div>
             {editMode
-              ? <input value={editYear} onChange={e=>setEditYear(e.target.value)} style={{ marginLeft:'auto', width:80, height:26, background:C.inputBg, border:'1px solid '+C.border, borderRadius:6, padding:'0 8px', fontSize:12, color:C.t2, fontFamily:'inherit', outline:'none', textAlign:'center' }} placeholder="年代"/>
+              ? <input value={editYear} onChange={e=>setEditYear(e.target.value)} style={{ marginLeft:'auto', width:80, height:26, background:C.inputBg, border:'1px solid '+C.border, borderRadius:6, padding:'0 8px', fontSize:12, color:C.t2, fontFamily:'inherit', outline:'none', textAlign:'center' }} placeholder="年份"/>
               : <span style={{ marginLeft:'auto', fontSize:12, color:C.t3 }}>{editYear}</span>
             }
           </div>
@@ -3848,11 +3904,13 @@ function P_CapsuleDetail() {
               AI 继续补充细节
             </button>
           )}
+          {(()=>{ const tags=generateTags(editText,[editYear].filter(Boolean)); return tags.length>0 && (
           <div style={{ marginTop:14, display:'flex', flexWrap:'wrap', gap:6 }}>
-            {['1998','江苏·扬州','花椒','蓝围裙'].map(tag=>(
+            {tags.map(tag=>(
               <span key={tag} style={{ fontSize:11, background:C.primaryPale, color:C.primary, padding:'3px 9px', borderRadius:9999, fontWeight:500 }}>#{tag}</span>
             ))}
           </div>
+          ); })()}
         </div>
 
         {/* 提前开启 */}
@@ -3922,13 +3980,13 @@ function P_EditMemory() {
             )}
           </div>
         </div>
-        {/* 年代 — 编辑态用年份数字输入，同编辑个人资料 */}
+        {/* 年份 — 编辑态用年份数字输入，同编辑个人资料 */}
         {isOwner
           ? <div>
-              <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:6 }}>年代</div>
+              <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:6 }}>年份</div>
               <input type="number" min="1900" max="2026" placeholder="例：1998" value={form.year||''} onChange={e=>setForm(f=>({...f,year:e.target.value}))} style={{ width:'100%', boxSizing:'border-box', height:40, border:'1.5px solid '+C.border, borderRadius:10, padding:'0 12px', fontSize:14, fontFamily:'inherit', background:'#FFFDF8', outline:'none', color:C.t1 }}/>
             </div>
-          : <div><div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:4 }}>年代</div><div style={{ fontSize:15, color:C.t1 }}>{form.year}</div></div>
+          : <div><div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:4 }}>年份</div><div style={{ fontSize:15, color:C.t1 }}>{form.year}</div></div>
         }
         {/* 地点 — 编辑态用 LocationPicker，查看态显示文本 */}
         {isOwner
@@ -3940,6 +3998,14 @@ function P_EditMemory() {
           <textarea value={form.text} onChange={isOwner?(e=>setForm(f=>({...f,text:e.target.value}))):undefined} readOnly={!isOwner} rows={5} style={{ width:'100%', boxSizing:'border-box', border:'1.5px solid '+C.border, borderRadius:12, padding:'12px 14px', fontSize:13.5, color:C.t1, fontFamily:'inherit', background:'#FFFDF8', outline:'none', resize:'none', lineHeight:1.75, opacity:isOwner?1:0.75 }}/>
           {isOwner && (<button onClick={()=>{ window.__p30ctx={ type:'draft', name:form.name, msgs:[{ from:'agent', t:'还想补充一些细节吗？' }] }; navigate('P30'); }} style={{ marginTop:8, width:'100%', height:42, borderRadius:10, border:'1.5px dashed '+C.primary, background:C.primaryPale, cursor:'pointer', fontFamily:'inherit', fontSize:13, color:C.primary, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2l2 6h6l-5 4 2 6-5-4-5 4 2-6-5-4h6l2-6Z" fill={C.primary}/></svg>让 AI 继续补充细节</button>)}
         </div>
+        {/* 标签 — AI 根据正文生成 4-5 个 */}
+        {(()=>{ const tags=generateTags(form.text,[form.year,form.location].filter(Boolean)); return tags.length>0 && (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+            {tags.map(tag=>(
+              <span key={tag} style={{ fontSize:11, background:C.primaryPale, color:C.primary, padding:'3px 9px', borderRadius:9999, fontWeight:500 }}>#{tag}</span>
+            ))}
+          </div>
+        ); })()}
         {isOwner && (<>
           <Btn fullWidth size="lg" onClick={()=>{ showToast('已保存修改'); navigate(-1); }}>保存</Btn>
           <div style={{ height:1, background:C.border, margin:'8px 0' }}/>
