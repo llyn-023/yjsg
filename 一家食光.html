@@ -179,7 +179,7 @@ const CN_REGIONS = {
   '海南':['海口','三亚','儋州','文昌','琼海','万宁','东方'],
   '香港':['中西区','东区','南区','湾仔','九龙城','观塘','深水埗','黄大仙','油尖旺','北区','大埔','沙田','西贡','荃湾','屯门','元朗','葵青','离岛'],'澳门':['澳门半岛','氹仔','路环'],'台湾':['台北','新北','台中','台南','高雄','桃园'],
 };
-function LocationPicker({ value, onChange, disabled }) {
+function LocationPicker({ value, onChange, disabled, label }) {
   const [open, setOpen] = React.useState(false);
   const provs = Object.keys(CN_REGIONS);
   const parts = (value||'').split(' · ');
@@ -189,7 +189,7 @@ function LocationPicker({ value, onChange, disabled }) {
   return (
     <>
       <div>
-        <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:6 }}>故乡 / 籍贯</div>
+        <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:6 }}>{label || '故乡 / 籍贯'}</div>
         <button onClick={()=>{ if(!disabled){ setSelProv(parts.length>1?parts[0]:provs[0]); setOpen(true); } }} style={{ width:'100%', height:44, padding:'0 14px', background:'#FFFDF8', border:'1px solid '+C.border, borderRadius:10, cursor:disabled?'default':'pointer', fontFamily:'inherit', textAlign:'left', fontSize:14, color:value?C.t1:C.t3, display:'flex', alignItems:'center', justifyContent:'space-between', opacity:disabled?0.6:1 }}>
           <span>{value||'选择省市'}</span>
           {!disabled && <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke={C.t3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
@@ -1045,11 +1045,11 @@ function P10_Home() {
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <AppInput label="吃食名" placeholder="例：外婆的甜酒酿" value={hook.dish} onChange={v=>setHook(f=>({...f,dish:v}))}/>
           <div>
-            <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>指定给谁讲 <span style={{ fontWeight:400, color:C.t4, fontSize:11 }}>可多选</span></div>
+            <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>指定给谁讲（可多选）</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
               {['全家',...TREE_NODES.filter(n=>n.status!=='placeholder').map(n=>(n.rel?n.rel+'·':'')+n.name)].map(p=>{
                 const sel=Array.isArray(hook.to)&&hook.to.includes(p);
-                return <button key={p} onClick={()=>setHook(f=>{ const arr=Array.isArray(f.to)?f.to:[]; const next=arr.includes(p)?arr.filter(x=>x!==p):[...arr,p]; return {...f,to:next}; })} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:`1.5px solid ${sel?C.primary:C.border}`, color:sel?'#fff':C.t1, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:sel?600:400, transition:'all 0.15s' }}>{p}</button>;
+                return <button key={p} onClick={()=>setHook(f=>{ const arr=Array.isArray(f.to)?f.to:[]; const next=arr.includes(p)?arr.filter(x=>x!==p):[...arr,p]; return {...f,to:next}; })} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:`1.5px solid ${sel?C.primary:C.border}`, color:sel?'#fff':C.t1, fontSize:12.5, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:5 }}>{sel && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}{p}</button>;
               })}
             </div>
           </div>
@@ -1314,7 +1314,7 @@ function P31_Story() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>送给谁</div>
+                  <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>送给谁（可多选）</div>
                   <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
                     {['全家','女儿·陈小豆','妹妹·陈小雨','表哥的孩子'].map(p=>{
                       const sel = capForm.to.includes(p);
@@ -1355,7 +1355,7 @@ function P11_Anchor() {
     sessionStorage.setItem('p11ctx', JSON.stringify(window.__p11ctx));
     window.__p11ctx = null;
   }
-  const p11data = JSON.parse(sessionStorage.getItem('p11ctx') || '{"id":"a1","name":"外婆的辣子鸡","by":"外婆 · 陈秀英","era":"1998","isOwner":true}');
+  const p11data = JSON.parse(sessionStorage.getItem('p11ctx') || '{"id":"a1","name":"外婆的辣子鸡","by":"外婆 · 陈秀英","era":"1998","isOwner":true,"location":"江苏 · 扬州"}');
   const isOwnerMem = p11data.isOwner !== false;
   const [cmt, setCmt] = React.useState('');
   const [cmtEdit, setCmtEdit] = React.useState({ idx:-1, val:'' });
@@ -1419,8 +1419,7 @@ function P11_Anchor() {
             <span>外婆 · 陈秀英</span>
             <span style={{ color:C.t4 }}>·</span>
             <span>1998</span>
-            <span style={{ color:C.t4 }}>·</span>
-            <span>江苏 · 扬州</span>
+            {p11data.location && <><span style={{ color:C.t4 }}>·</span><span>{p11data.location}</span></>}
           </div>
 
           <div style={{ marginTop:18, display:'flex', flexDirection:'column', gap:10, fontSize:14, color:C.t1, lineHeight:1.95, fontFamily:'"Noto Serif SC",serif' }}>
@@ -1800,11 +1799,11 @@ function P20_Tree() {
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <AppInput label="这道味道叫什么" placeholder="例：外婆的辣子鸡" value={hookDish20} onChange={v=>setHookDish20(v)}/>
           <div>
-            <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>指定给谁讲 <span style={{ fontWeight:400, color:C.t4, fontSize:11 }}>可多选</span></div>
+            <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>指定给谁讲（可多选）</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
               {['全家',...TREE_NODES.filter(n=>n.status!=='placeholder').map(n=>(n.rel?n.rel+'·':'')+n.name)].map(p=>{
                 const sel=hookTo20.includes(p);
-                return <button key={p} onClick={()=>setHookTo20(arr=>arr.includes(p)?arr.filter(x=>x!==p):[...arr,p])} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:`1.5px solid ${sel?C.primary:C.border}`, color:sel?'#fff':C.t1, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:sel?600:400, transition:'all 0.15s' }}>{p}</button>;
+                return <button key={p} onClick={()=>setHookTo20(arr=>arr.includes(p)?arr.filter(x=>x!==p):[...arr,p])} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:`1.5px solid ${sel?C.primary:C.border}`, color:sel?'#fff':C.t1, fontSize:12.5, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:5 }}>{sel && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}{p}</button>;
               })}
             </div>
           </div>
@@ -2180,11 +2179,11 @@ function P40_Feed() {
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <AppInput label="这道味道叫什么" placeholder="例：外婆的辣子鸡" value={hookDish40} onChange={v=>setHookDish40(v)}/>
           <div>
-            <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>指定给谁讲 <span style={{ fontWeight:400, color:C.t4, fontSize:11 }}>可多选</span></div>
+            <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>指定给谁讲（可多选）</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
               {['全家',...TREE_NODES.filter(n=>n.status!=='placeholder').map(n=>(n.rel?n.rel+'·':'')+n.name)].map(p=>{
                 const sel=hookTo40.includes(p);
-                return <button key={p} onClick={()=>setHookTo40(arr=>arr.includes(p)?arr.filter(x=>x!==p):[...arr,p])} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:`1.5px solid ${sel?C.primary:C.border}`, color:sel?'#fff':C.t1, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:sel?600:400, transition:'all 0.15s' }}>{p}</button>;
+                return <button key={p} onClick={()=>setHookTo40(arr=>arr.includes(p)?arr.filter(x=>x!==p):[...arr,p])} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:`1.5px solid ${sel?C.primary:C.border}`, color:sel?'#fff':C.t1, fontSize:12.5, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:5 }}>{sel && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}{p}</button>;
               })}
             </div>
           </div>
@@ -2326,11 +2325,11 @@ function P50_Me() {
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <AppInput label="这道味道叫什么" placeholder="例：外婆的辣子鸡" value={hookDish50} onChange={v=>setHookDish50(v)}/>
           <div>
-            <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>指定给谁讲 <span style={{ fontWeight:400, color:C.t4, fontSize:11 }}>可多选</span></div>
+            <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>指定给谁讲（可多选）</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
               {['全家',...TREE_NODES.filter(n=>n.status!=='placeholder').map(n=>(n.rel?n.rel+'·':'')+n.name)].map(p=>{
                 const sel=hookTo50.includes(p);
-                return <button key={p} onClick={()=>setHookTo50(arr=>arr.includes(p)?arr.filter(x=>x!==p):[...arr,p])} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:`1.5px solid ${sel?C.primary:C.border}`, color:sel?'#fff':C.t1, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:sel?600:400, transition:'all 0.15s' }}>{p}</button>;
+                return <button key={p} onClick={()=>setHookTo50(arr=>arr.includes(p)?arr.filter(x=>x!==p):[...arr,p])} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:`1.5px solid ${sel?C.primary:C.border}`, color:sel?'#fff':C.t1, fontSize:12.5, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:5 }}>{sel && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}{p}</button>;
               })}
             </div>
           </div>
@@ -3151,11 +3150,15 @@ function P62_Capsule() {
             </div>
           </div>
           <div>
-            <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>送给谁</div>
+            <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>送给谁（可多选）</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-              {['全家','女儿·陈小豆','妹妹·陈小雨','表哥的孩子'].map(p=>(
-                <button key={p} onClick={()=>setForm(f=>({...f,to:p}))} style={{ height:34, padding:'0 14px', borderRadius:9999, background: form.to===p?C.primary:'transparent', border:`1.5px solid ${form.to===p?C.primary:C.border}`, color: form.to===p?'#fff':C.t1, fontSize:12.5, cursor:'pointer', fontFamily:'inherit' }}>{p}</button>
-              ))}
+              {['全家','女儿·陈小豆','妹妹·陈小雨','表哥的孩子'].map(p=>{
+                const sel = Array.isArray(form.to) && form.to.includes(p);
+                return <button key={p} onClick={()=>setForm(f=>{ const arr=Array.isArray(f.to)?f.to:[f.to]; const next=arr.includes(p)?arr.filter(x=>x!==p):[...arr,p]; return {...f,to:next}; })} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:'1.5px solid '+(sel?C.primary:C.border), color:sel?'#fff':C.t1, fontSize:12.5, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:5 }}>
+                  {sel && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  {p}
+                </button>;
+              })}
             </div>
           </div>
           <button onClick={()=>showToast('选择记忆·已选 0 件')} style={{ padding:'14px 16px', background:'transparent', border:`1.5px dashed ${C.border}`, borderRadius:10, cursor:'pointer', fontFamily:'inherit', fontSize:13, color:C.t2, textAlign:'left', display:'flex', justifyContent:'space-between' }}>
@@ -3637,51 +3640,6 @@ function P_GrayDish() {
 }
 
 // ══════════════════════════════════════════════════
-// P_NewCapsule — 新建胶囊（全页版）
-// ══════════════════════════════════════════════════
-function P_NewCapsule() {
-  const { navigate, showToast } = useApp();
-  const [form, setForm] = React.useState({ name:'', whenY:'2030', whenM:'1', whenD:'1', to:'女儿·陈小豆', items:[] });
-  return (
-    <div style={{ width:'100%', height:'100%', background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ height:44, flexShrink:0 }}/>
-      <NavBar title="新建胶囊" onBack={()=>navigate(-1)}/>
-      <div style={{ flex:1, overflowY:'auto', padding:'8px 22px 48px', display:'flex', flexDirection:'column', gap:14 }}>
-        <AppInput label="胶囊名字" placeholder="例：给妹妹十八岁的老味道" value={form.name} onChange={v=>setForm(f=>({...f,name:v}))}/>
-        <div>
-          <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:6 }}>开启时间</div>
-          <div>
-            <div style={{ fontSize:11, color:C.t3, marginBottom:6, display:'flex' }}>
-              <span style={{ flex:2, textAlign:'center' }}>年</span>
-              <span style={{ flex:1, textAlign:'center', marginLeft:8 }}>月</span>
-              <span style={{ flex:1, textAlign:'center', marginLeft:8 }}>日</span>
-            </div>
-            <div style={{ display:'flex', gap:8 }}>
-              <div style={{ flex:2 }}><ScrollPicker options={Array.from({length:30},(_,i)=>({ value:String(2025+i), label:(2025+i)+'年' }))} value={form.whenY||'2030'} onChange={v=>setForm(f=>({...f,whenY:v}))}/></div>
-              <div style={{ flex:1 }}><ScrollPicker options={Array.from({length:12},(_,i)=>({ value:String(i+1), label:(i+1)+'月' }))} value={form.whenM||'1'} onChange={v=>setForm(f=>({...f,whenM:v}))}/></div>
-              <div style={{ flex:1 }}><ScrollPicker options={Array.from({length:31},(_,i)=>({ value:String(i+1), label:(i+1)+'日' }))} value={form.whenD||'1'} onChange={v=>setForm(f=>({...f,whenD:v}))}/></div>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>送给谁</div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-            {['全家','女儿·陈小豆','妹妹·陈小雨','表哥的孩子'].map(p=>(
-              <button key={p} onClick={()=>setForm(f=>({...f,to:p}))} style={{ height:34, padding:'0 14px', borderRadius:9999, background:form.to===p?C.primary:'transparent', border:'1.5px solid '+(form.to===p?C.primary:C.border), color:form.to===p?'#fff':C.t1, fontSize:12.5, cursor:'pointer', fontFamily:'inherit' }}>{p}</button>
-            ))}
-          </div>
-        </div>
-        <button onClick={()=>showToast('选择记忆·已选0 件')} style={{ padding:'14px 16px', background:'transparent', border:'1.5px dashed '+C.border, borderRadius:10, cursor:'pointer', fontFamily:'inherit', fontSize:13, color:C.t2, textAlign:'left', display:'flex', justifyContent:'space-between' }}>
-          <span>挑选要封存的记忆</span><span style={{ color:C.t3 }}>从锦点中选 ›</span>
-        </button>
-        <Btn fullWidth size="lg" disabled={!form.name.trim()} onClick={()=>{ window.__capsuleCtx={ id:'new_'+Date.now(), name:form.name, to:form.to, open:form.whenY+'年'+form.whenM+'月'+form.whenD+'日', days:365, count:0, img:null }; navigate('P_CapsuleDetail'); }}>封存</Btn>
-      </div>
-    </div>
-  );
-}
-
-
-// ══════════════════════════════════════════════════
 // P_Notifications — 通知中心（全页版）
 // ══════════════════════════════════════════════════
 function P_Notifications() {
@@ -3885,7 +3843,7 @@ function P_CapsuleDetail() {
             : <div style={{ fontSize:14, color:C.t1, lineHeight:1.95, fontFamily:'"Noto Serif SC",serif' }}>{editText}</div>
           }
           {editMode && (
-            <button onClick={()=>{ window.__p30ctx={ type:'draft', name:editName, msgs:[{ from:'agent', t:'AI继续补充细节吗？' }] }; navigate('P30'); }} style={{ marginTop:12, width:'100%', height:40, borderRadius:10, border:'1.5px dashed '+C.primary, background:C.primaryPale, cursor:'pointer', fontFamily:'inherit', fontSize:13, color:C.primary, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
+            <button onClick={()=>{ window.__p30ctx={ type:'anchor', name:editName }; navigate('P30'); }} style={{ marginTop:12, width:'100%', height:40, borderRadius:10, border:'1.5px dashed '+C.primary, background:C.primaryPale, cursor:'pointer', fontFamily:'inherit', fontSize:13, color:C.primary, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2l2 6h6l-5 4 2 6-5-4-5 4 2-6-5-4h6l2-6Z" fill={C.primary}/></svg>
               AI 继续补充细节
             </button>
@@ -3964,9 +3922,18 @@ function P_EditMemory() {
             )}
           </div>
         </div>
+        {/* 年代 — 编辑态用年份数字输入，同编辑个人资料 */}
         {isOwner
-          ? <AppInput label="年代" placeholder="例：1998" value={form.year} onChange={v=>setForm(f=>({...f,year:v}))}/>
+          ? <div>
+              <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:6 }}>年代</div>
+              <input type="number" min="1900" max="2026" placeholder="例：1998" value={form.year||''} onChange={e=>setForm(f=>({...f,year:e.target.value}))} style={{ width:'100%', boxSizing:'border-box', height:40, border:'1.5px solid '+C.border, borderRadius:10, padding:'0 12px', fontSize:14, fontFamily:'inherit', background:'#FFFDF8', outline:'none', color:C.t1 }}/>
+            </div>
           : <div><div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:4 }}>年代</div><div style={{ fontSize:15, color:C.t1 }}>{form.year}</div></div>
+        }
+        {/* 地点 — 编辑态用 LocationPicker，查看态显示文本 */}
+        {isOwner
+          ? <LocationPicker label="地点" value={form.location||''} onChange={v=>setForm(f=>({...f,location:v}))}/>
+          : <div><div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:4 }}>地点</div><div style={{ fontSize:15, color:C.t1 }}>{form.location||'未设置'}</div></div>
         }
         <div>
           <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:6 }}>记忆正文</div>
@@ -4011,7 +3978,7 @@ const SCREENS = [
   { id:'P_CreateFamily', group:'内页', label:'创建家族',   sub:'CreateFamily', Comp: P_CreateFamily },
   { id:'P_JoinFamily',   group:'内页', label:'加入家族',   sub:'JoinFamily',   Comp: P_JoinFamily },
   { id:'P_GrayDish',     group:'内页', label:'待讲味道',   sub:'GrayDish',     Comp: P_GrayDish },
-  { id:'P_NewCapsule',   group:'内页', label:'新建胶囊',   sub:'NewCapsule',   Comp: P_NewCapsule },
+
   { id:'P_Notifications',group:'内页', label:'通知中心',   sub:'Notifications',Comp: P_Notifications },
   { id:'P_EditFamily',   group:'内页', label:'编辑家族信息', sub:'EditFamily',   Comp: P_EditFamily },
   { id:'P_CapsuleDetail',group:'内页', label:'胶囊详情',   sub:'Capsule Detail',Comp: P_CapsuleDetail },
