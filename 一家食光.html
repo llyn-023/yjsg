@@ -49,6 +49,169 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
+<!-- Supabase JS（Phase 0.2 连通性接入） -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // 全局 Supabase 客户端。anon key 公开可见、靠 RLS 保护；
+  // service_role / GLM 等机密 key 绝不写进前端。
+  window.SUPABASE_URL = 'https://jgdrhqugjuwmzexmcxcz.supabase.co';
+  window.SUPABASE_ANON_KEY = 'sb_publishable_v5G6Tpa4aVg86iPsrSK-kA_Et5coZW5';
+  window.sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  // 连通性自检：读取 health 表一行，并在页面右上角显示结果角标（不用开控制台）
+  window.sb.from('health').select('*').limit(1).then(function (r) {
+    var ok = !r.error;
+    var txt = ok ? ('✅ Supabase 连通：' + JSON.stringify(r.data)) : ('❌ ' + r.error.message);
+    console.log('[Supabase 连通]', txt);
+    var b = document.createElement('div');
+    b.textContent = txt;
+    b.style.cssText = 'position:fixed;top:8px;right:8px;z-index:999999;max-width:80vw;background:'
+      + (ok ? '#285B4E' : '#b00020') + ';color:#fff;padding:8px 12px;border-radius:8px;font:13px/1.5 system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.25)';
+    b.onclick = function () { b.remove(); };
+    document.body.appendChild(b);
+  });
+</script>
+
+<!-- 客户端 API 层（Phase 1.2 起，逐步替换 Mock / sessionStorage） -->
+<script>
+  window.api = window.api || {};
+  // 密保问题固定一句；答案 trim 后 SHA-256 哈希，库内不存明文
+  const API_SEC_QUESTION = '你小时候最爱吃的一道菜叫什么？';
+  async function apiSha256(text) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  window.api.auth = {
+    // 注册：username 映射成 {username}@yjsg.local；昵称/密保经 options.data 由触发器落 profiles
+    async register({ username, password, nickname, securityAnswer }) {
+      const u = username.trim();
+      const { data, error } = await window.sb.auth.signUp({
+        email: u + '@yjsg.com',
+        password,
+        options: { data: {
+          username: u,
+          nickname: nickname.trim(),
+          security_question: API_SEC_QUESTION,
+          security_answer_hash: await apiSha256(securityAnswer.trim())
+        } }
+      });
+      return { data, error };
+    },
+    // 登录
+    async login({ username, password }) {
+      const { data, error } = await window.sb.auth.signInWithPassword({
+        email: username.trim() + '@yjsg.com',
+        password
+      });
+      return { data, error };
+    },
+    // 退出
+    async logout() {
+      const { error } = await window.sb.auth.signOut();
+      return { error };
+    },
+    // 密保找回-验答案（→ token）
+    async forgotAnswer({ username, answer }) {
+      const { data, error } = await window.sb.functions.invoke('auth-forgot', { body: { action: 'verify-answer', username, answer } });
+      return data || { ok: false, error: (error && error.message) || '请求失败' };
+    },
+    // 密保找回-重置密码
+    async forgotReset({ token, newPassword }) {
+      const { data, error } = await window.sb.functions.invoke('auth-forgot', { body: { action: 'reset', token, newPassword } });
+      return data || { ok: false, error: (error && error.message) || '请求失败' };
+    },
+    // 改密（先以当前密码验身份）
+    async changePassword({ currentPassword, newPassword }) {
+      const u = (await window.sb.auth.getUser()).data.user;
+      if (!u) return { ok: false, error: '未登录' };
+      const { error: e1 } = await window.sb.auth.signInWithPassword({ email: u.email, password: currentPassword });
+      if (e1) return { ok: false, error: '当前密码不正确' };
+      const { error } = await window.sb.auth.updateUser({ password: newPassword });
+      return error ? { ok: false, error: error.message } : { ok: true };
+    },
+    // 改密保答案（问题固定不变）
+    async changeSecurityAnswer({ currentPassword, newAnswer }) {
+      const u = (await window.sb.auth.getUser()).data.user;
+      if (!u) return { ok: false, error: '未登录' };
+      const { error: e1 } = await window.sb.auth.signInWithPassword({ email: u.email, password: currentPassword });
+      if (e1) return { ok: false, error: '当前密码不正确' };
+      const hash = await apiSha256(newAnswer.trim());
+      const { error } = await window.sb.from('profiles').update({ security_answer_hash: hash, updated_at: new Date().toISOString() }).eq('id', u.id);
+      return error ? { ok: false, error: error.message } : { ok: true };
+    },
+    // 当前用户资料（未登录返回 null）
+    async me() {
+      const { data: { user } } = await window.sb.auth.getUser();
+      if (!user) return null;
+      const { data: prof } = await window.sb.from('profiles').select('id,username,nickname,avatar_url,gender,birthday,hometown,dish').eq('id', user.id).maybeSingle();
+      return prof || { id: user.id };
+    }
+  };
+
+  // 家族
+  window.api.family = {
+    // 创建家族：生成 6 位码（碰撞重试）+ 插 families + 插创建者节点
+    async create({ name, surname, myName }) {
+      const u = (await window.sb.auth.getUser()).data.user;
+      if (!u) return { ok: false, error: '未登录' };
+      const { data: prof } = await window.sb.from('profiles').select('gender').eq('id', u.id).maybeSingle();
+      const g = (prof && prof.gender === '女') ? 'female' : 'male'; // 性别以 profile 为准，无则占位 male（后续定位/编辑可改）
+      let fam = null, lastErr = null;
+      for (let i = 0; i < 8; i++) {
+        const code = Math.random().toString(36).slice(2, 8).toUpperCase().padEnd(6, 'A').slice(0, 6);
+        const { data, error } = await window.sb.from('families').insert({ name, surname, code, creator_id: u.id }).select().single();
+        if (!error) { fam = data; break; }
+        if (!/duplicate|unique|23505/i.test(error.message)) { lastErr = error.message; break; }
+      }
+      if (!fam) return { ok: false, error: lastErr || '生成代码失败，请重试' };
+      const { error: e2 } = await window.sb.from('family_members').insert({ family_id: fam.id, user_id: u.id, name: myName, gender: g, status: 'claimed', role: 'creator' });
+      if (e2) return { ok: false, error: e2.message };
+      return { ok: true, family: fam };
+    },
+    // 凭码加入：走 request_join RPC（服务端按 code 查 family + 建 pending，绕 RLS）
+    async joinByCode(code) {
+      const { data, error } = await window.sb.rpc('request_join', { p_code: String(code || '').toUpperCase() });
+      if (error) return { ok: false, error: (error.message || '').replace(/^ERROR:\s*/i, '').replace(/^PGRST\d+:\s*/i, '').slice(0, 80) || '加入失败' };
+      return { ok: true, pending: true, familyName: data && data[0] && data[0].family_name };
+    },
+    // 我加入的家族列表
+    async list() {
+      const u = (await window.sb.auth.getUser()).data.user;
+      if (!u) return [];
+      const { data } = await window.sb.from('family_members').select('family_id,role,families(id,name,surname,code)').eq('user_id', u.id);
+      return (data || []).map(m => ({
+        id: m.families && m.families.id,
+        name: m.families && m.families.name,
+        surname: m.families && m.families.surname,
+        code: m.families && m.families.code,
+        role: m.role === 'creator' ? '创建者' : '成员'
+      })).filter(f => f.id);
+    },
+    // 家族详情 + 是否创建者
+    async get(id) {
+      const u = (await window.sb.auth.getUser()).data.user;
+      if (!u) return null;
+      const { data: fam } = await window.sb.from('families').select('id,name,surname,description,code,creator_id').eq('id', id).maybeSingle();
+      if (!fam) return null;
+      return Object.assign({}, fam, { isCreator: fam.creator_id === u.id });
+    },
+    // 成员列表（只读；关系·名字待 2.5 称谓落库后补）
+    async members(id) {
+      const { data } = await window.sb.from('family_members').select('id,name,role,status,gender,user_id').eq('family_id', id).order('created_at');
+      return data || [];
+    },
+    // 编辑家族信息（creator；RLS families_update 放行）
+    async edit(id, patch) {
+      const p = { updated_at: new Date().toISOString() };
+      if (patch.name !== undefined) p.name = patch.name;
+      if (patch.surname !== undefined) p.surname = patch.surname;
+      if (patch.description !== undefined) p.description = patch.description;
+      const { data, error } = await window.sb.from('families').update(p).eq('id', id).select().single();
+      if (error) return { ok: false, error: error.message };
+      return { ok: true, family: data };
+    }
+  };
+</script>
+
 <script type="text/babel">
 // ══════════════════════════════════════════════════
 // SHARED — 设计令牌 + 公共组件
@@ -318,11 +481,14 @@ function P1_Login() {
   const [reg, setReg] = React.useState({ username:'', password:'', confirm:'', nickname:'', secA1:'', secA2:'', agreed:false });
   const [regErr, setRegErr] = React.useState({});
   const [fgt, setFgt] = React.useState({ username:'', step:1, a1:'', newPwd:'', confirmPwd:'' });
-  function handleLogin() {
+  const [fgtToken, setFgtToken] = React.useState('');
+  async function handleLogin() {
     const e = {};
     if (!form.username.trim()) e.username='请输入用户名';
     if (!form.password) e.password='请输入密码';
     if (Object.keys(e).length) { setErrors(e); return; }
+    const { error } = await window.api.auth.login({ username: form.username, password: form.password });
+    if (error) { showToast('用户名或密码错误'); return; }
     navigate('P2');
   }
   function handleRegister() {
@@ -389,7 +555,7 @@ function P1_Login() {
           <Btn onClick={handleRegister} fullWidth size="lg">完成注册</Btn>
         </div>
       </BottomSheet>
-      <BottomSheet open={sheet==='forgot'} onClose={()=>{ setSheet(null); setFgt({username:'',step:1,a1:'',newPwd:'',confirmPwd:''}); }} title={fgt.step===1?'找回密码':fgt.step===2?'验证身份':'设置新密码'}>
+      <BottomSheet open={sheet==='forgot'} onClose={()=>{ setSheet(null); setFgtToken(''); setFgt({username:'',step:1,a1:'',newPwd:'',confirmPwd:''}); }} title={fgt.step===1?'找回密码':fgt.step===2?'验证身份':'设置新密码'}>
         <div style={{ display:'flex', flexDirection:'column', gap:14, paddingBottom:24 }}>
           {/* 步骤指示器 */}
           <div style={{ display:'flex', alignItems:'center', gap:4 }}>
@@ -420,9 +586,11 @@ function P1_Login() {
               error={fgt.confirmPwd&&fgt.newPwd!==fgt.confirmPwd?'两次密码不一致':''}
             />
             <Btn
-              onClick={()=>{
+              onClick={async()=>{
                 if(fgt.newPwd.length<6||fgt.newPwd!==fgt.confirmPwd) return;
-                setSheet(null);
+                const r = await window.api.auth.forgotReset({ token: fgtToken, newPassword: fgt.newPwd });
+                if(!r.ok){ showToast(r.error||'重置失败'); return; }
+                setSheet(null); setFgtToken('');
                 setFgt({username:'',step:1,a1:'',newPwd:'',confirmPwd:''});
                 showToast('密码已更新，请重新登录');
               }}
@@ -437,7 +605,7 @@ function P1_Login() {
               <AppInput placeholder="请输入答案" value={fgt.a1} onChange={v=>setFgt(f=>({...f,a1:v}))}/>
             </div>
 
-            <Btn onClick={()=>{ if(fgt.a1.trim()){ showToast('验证成功'); setTimeout(()=>setFgt(f=>({...f,step:3})),600); } }} disabled={!fgt.a1.trim()} fullWidth>验证</Btn>
+            <Btn onClick={async()=>{ if(!fgt.a1.trim()) return; const r = await window.api.auth.forgotAnswer({ username: fgt.username, answer: fgt.a1 }); if(!r.ok){ showToast(r.error||'验证失败'); return; } setFgtToken(r.token); showToast('验证成功'); setTimeout(()=>setFgt(f=>({...f,step:3})),400); }} disabled={!fgt.a1.trim()} fullWidth>验证</Btn>
           </>)}
         </div>
       </BottomSheet>
@@ -455,30 +623,34 @@ function P2_Family() {
   const [fErr, setFErr] = React.useState({});
   const [code, setCode] = React.useState('');
   const [codeErr, setCodeErr] = React.useState('');
-  const VALID = ['YJ2026','ABCD12','HOME01'];
-  const myFamilies = [
-    { id:'f1', name:'陈氏一家', initial:'陈', role:'创建者', lit:4, gray:3 },
-    { id:'f2', name:'妈妈那边', initial:'李', role:'成员',   lit:2, gray:5 },
-  ];
-  function handleCreate() {
+  const [myFams, setMyFams] = React.useState([]);
+  const [createdFam, setCreatedFam] = React.useState(null);
+  React.useEffect(() => { window.api.family.list().then(setMyFams); }, []);
+  async function handleCreate() {
     const e = {};
     if (!fam.name.trim()) e.name='请填写家族名称';
     if (!fam.surname.trim()) e.surname='请填写家族姓氏';
     if (!fam.myName.trim()) e.myName='请填写你的姓名';
     if (Object.keys(e).length) { setFErr(e); return; }
+    const r = await window.api.family.create({ name:fam.name.trim(), surname:fam.surname.trim(), myName:fam.myName.trim() });
+    if (!r.ok) { showToast(r.error || '创建失败'); return; }
+    setCreatedFam(r.family);
+    window.api.family.list().then(setMyFams);
     setSheet('created');
   }
-  function handleJoin() {
+  async function handleJoin() {
     if (code.length!==6) { setCodeErr('家族代码为 6 位'); return; }
-    if (!VALID.includes(code)) { setCodeErr('代码无效，请向家族成员核实'); return; }
-    setSheet(null); navigate('P3');
+    const r = await window.api.family.joinByCode(code);
+    if (!r.ok) { setCodeErr(r.error || '加入失败'); return; }
+    setSheet(null); setCode(''); setCodeErr('');
+    showToast('已提交加入申请，等待创建者审核');
   }
   return (
     <div style={{ width:'100%', height:'100%', background:C.bg, display:'flex', flexDirection:'column', position:'relative', overflow:'hidden' }}>
       <div style={{ position:'relative', height:210, flexShrink:0, overflow:'hidden' }}>
         <img src="uploads/微信图片_20260611103040_114_20.png" alt="" style={{ width:'100%', height:270, objectFit:'cover', objectPosition:'center 18%', display:'block' }}/>
         <div style={{ position:'absolute', inset:0, background:`linear-gradient(to bottom,rgba(250,247,242,0) 30%,${C.bg} 100%)` }}/>
-        <button onClick={()=>navigate('P1')} style={{ position:'absolute', top:54, right:14, background:'rgba(255,255,255,0.78)', backdropFilter:'blur(6px)', border:'none', borderRadius:20, padding:'6px 14px', fontSize:13, color:C.t2, cursor:'pointer', fontFamily:'inherit' }}>退出登录</button>
+        <button onClick={async()=>{ await window.api.auth.logout(); navigate('P1'); }} style={{ position:'absolute', top:54, right:14, background:'rgba(255,255,255,0.78)', backdropFilter:'blur(6px)', border:'none', borderRadius:20, padding:'6px 14px', fontSize:13, color:C.t2, cursor:'pointer', fontFamily:'inherit' }}>退出登录</button>
 
       </div>
       <div style={{ flex:1, overflowY:'auto', padding:'4px 24px 56px', display:'flex', flexDirection:'column', gap:14 }}>
@@ -502,11 +674,11 @@ function P2_Family() {
           </div>
           <span style={{ color:C.primary100, fontSize:22 }}>›</span>
         </button>
-        <button onClick={()=>{ if(myFamilies.length>0) setSheet('myFam'); else showToast('你还没有加入任何家族'); }} style={{ width:'100%', padding:'18px 20px', background:'#FFFDF8', border:`1.5px solid ${C.primary100}`, borderRadius:18, cursor:'pointer', display:'flex', alignItems:'center', gap:14, boxShadow:'0 2px 12px rgba(40,91,78,0.06)', textAlign:'left', marginTop:2 }}>
+        <button onClick={()=>{ if(myFams.length>0) setSheet('myFam'); else showToast('你还没有加入任何家族'); }} style={{ width:'100%', padding:'18px 20px', background:'#FFFDF8', border:`1.5px solid ${C.primary100}`, borderRadius:18, cursor:'pointer', display:'flex', alignItems:'center', gap:14, boxShadow:'0 2px 12px rgba(40,91,78,0.06)', textAlign:'left', marginTop:2 }}>
           <img src="uploads/微信图片_2026-06-11_094419_425.png" alt="" style={{ width:58, height:58, objectFit:'contain', flexShrink:0 }}/>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:16, fontWeight:700, color:C.primaryDark, marginBottom:3 }}>查看已加入家族</div>
-            <div style={{ fontSize:13, color:C.t2 }}>已加入 {myFamilies.length} 个家族</div>
+            <div style={{ fontSize:13, color:C.t2 }}>已加入 {myFams.length} 个家族</div>
           </div>
           <span style={{ color:C.primary100, fontSize:22 }}>›</span>
         </button>
@@ -514,12 +686,12 @@ function P2_Family() {
       </div>
       <BottomSheet open={sheet==='myFam'} onClose={()=>setSheet(null)} title="选择家族">
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {myFamilies.map(f=>(
+          {myFams.map(f=>(
             <button key={f.id} onClick={()=>{ setSheet(null); navigate('P10'); }} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'#FFFDF8', border:'1.5px solid '+C.border, borderRadius:14, cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
-              <div style={{ width:44, height:44, borderRadius:'50%', background:C.primary, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:700, fontFamily:'"Noto Serif SC",serif', flexShrink:0 }}>{f.initial}</div>
+              <div style={{ width:44, height:44, borderRadius:'50%', background:C.primary, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:700, fontFamily:'"Noto Serif SC",serif', flexShrink:0 }}>{(f.surname||f.name||'家').charAt(0)}</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:15, fontWeight:700, color:C.t1, fontFamily:'"Noto Serif SC",serif' }}>{f.name}</div>
-                <div style={{ fontSize:11.5, color:C.t3, marginTop:2 }}>{f.role} · 点亮 {f.lit} 道 · 待讲 {f.gray} 道</div>
+                <div style={{ fontSize:11.5, color:C.t3, marginTop:2 }}>{f.role} · 点亮 {f.lit||0} · 待讲 {f.gray||0}</div>
               </div>
               <span style={{ fontSize:20, color:C.primary }}>›</span>
             </button>
@@ -540,7 +712,7 @@ function P2_Family() {
           <div style={{ fontSize:14, color:C.t2, textAlign:'center', lineHeight:1.85 }}>把代码分享给家人，邀请他们加入<br/><strong style={{ color:C.primaryDark }}>「{fam.name||'我的家族'}」</strong></div>
           <div style={{ width:'100%', background:C.primaryPale, border:`2px dashed ${C.primaryLight}`, borderRadius:16, padding:'20px 0', textAlign:'center' }}>
             <div style={{ fontSize:11, color:C.primaryLight, letterSpacing:2, marginBottom:8 }}>家族代码</div>
-            <div style={{ fontFamily:'monospace', fontSize:36, fontWeight:900, color:C.primary, letterSpacing:10 }}>YJ2026</div>
+            <div style={{ fontFamily:'monospace', fontSize:36, fontWeight:900, color:C.primary, letterSpacing:10 }}>{createdFam ? createdFam.code : '------'}</div>
           </div>
           <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
             {['094308_309','094322_572','094332_860'].map((n,i)=>(
@@ -551,7 +723,7 @@ function P2_Family() {
             <div style={{ width:44, height:44, borderRadius:'50%', background:C.primaryPale, border:`2px dashed ${C.primary100}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, color:C.primaryLight }}>+</div>
           </div>
           <div style={{ fontSize:12, color:C.t3, textAlign:'center', lineHeight:1.7 }}>等家人加入后，每位家人都会有一道属于自己的味道</div>
-          <Btn onClick={()=>showToast('代码已复制')} variant="outline" fullWidth>复制代码</Btn>
+          <Btn onClick={async()=>{ const c = createdFam ? createdFam.code : ''; try { await navigator.clipboard.writeText(c); } catch(e){ const t=document.createElement('textarea'); t.value=c; document.body.appendChild(t); t.select(); try{document.execCommand('copy');}catch(_){} document.body.removeChild(t); } showToast(c ? '代码已复制：'+c : '暂无代码'); }} variant="outline" fullWidth>复制代码</Btn>
           <Btn onClick={()=>{ setSheet(null); showToast('家族创建成功！'); setTimeout(()=>navigate('P3'),800); }} fullWidth size="lg">进入家族</Btn>
         </div>
       </BottomSheet>
@@ -2484,6 +2656,8 @@ function P51_Settings() {
   const { navigate, showToast } = useApp();
   const [sheet, setSheet] = React.useState(null);
   const [notif, setNotif] = React.useState({ activity:true, mention:true, review:true, capsule:true, weekly:false });
+  const [pwd, setPwd] = React.useState({ cur:'', new1:'', new2:'' });
+  const [sec, setSec] = React.useState({ cur:'', ans:'' });
   const groups = [
     { title:'账号安全', items:[
       { t:'修改密码', go:()=>setSheet('pwd') },
@@ -2521,26 +2695,26 @@ function P51_Settings() {
         ))}
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:24 }}>
           <Btn variant="outline" onClick={()=>setSheet('logout')} fullWidth>退出登录</Btn>
-          <button onClick={()=>setSheet('del')} style={{ background:'transparent', border:'none', cursor:'pointer', fontSize:13, color:C.red, padding:10, fontFamily:'inherit' }}>注销账号</button>
+          <button style={{ background:'transparent', border:'none', cursor:'pointer', fontSize:13, color:C.red, padding:10, fontFamily:'inherit' }}>注销账号</button>
         </div>
       </div>
       <BottomSheet open={sheet==='pwd'} onClose={()=>setSheet(null)} title="修改密码">
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <AppInput label="当前密码" type="password" placeholder="用以验证身份"/>
-          <AppInput label="新密码" type="password" placeholder="至少 6 位"/>
-          <AppInput label="确认新密码" type="password" placeholder="再输一次"/>
-          <Btn fullWidth size="lg" onClick={()=>{ setSheet(null); showToast('密码已更新'); }}>保存</Btn>
+          <AppInput label="当前密码" type="password" placeholder="用以验证身份" value={pwd.cur} onChange={v=>setPwd(p=>({...p,cur:v}))}/>
+          <AppInput label="新密码" type="password" placeholder="至少 6 位" value={pwd.new1} onChange={v=>setPwd(p=>({...p,new1:v}))}/>
+          <AppInput label="确认新密码" type="password" placeholder="再输一次" value={pwd.new2} onChange={v=>setPwd(p=>({...p,new2:v}))} error={pwd.new2&&pwd.new1!==pwd.new2?'两次不一致':''}/>
+          <Btn fullWidth size="lg" onClick={async()=>{ if(pwd.new1.length<6){ showToast('新密码至少 6 位'); return; } if(pwd.new1!==pwd.new2){ showToast('两次新密码不一致'); return; } const r = await window.api.auth.changePassword({ currentPassword: pwd.cur, newPassword: pwd.new1 }); if(!r.ok){ showToast(r.error||'修改失败'); return; } setSheet(null); setPwd({cur:'',new1:'',new2:''}); showToast('密码已更新'); }}>保存</Btn>
         </div>
       </BottomSheet>
-      <BottomSheet open={sheet==='sec'} onClose={()=>setSheet(null)} title="修改密保问题">
+      <BottomSheet open={sheet==='sec'} onClose={()=>setSheet(null)} title="修改密保答案">
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <AppInput label="当前密码" type="password" placeholder="验证身份"/>
+          <AppInput label="当前密码" type="password" placeholder="验证身份" value={sec.cur} onChange={v=>setSec(s=>({...s,cur:v}))}/>
           <div style={{ background:'#F5F0E8', borderRadius:12, padding:'12px 14px' }}>
-            <div style={{ fontSize:12, fontWeight:700, color:C.t2, marginBottom:6 }}>新问题</div>
+            <div style={{ fontSize:12, fontWeight:700, color:C.t2, marginBottom:6 }}>密保问题（固定）</div>
             <div style={{ fontSize:13, color:C.t1, marginBottom:8, lineHeight:1.7 }}>你小时候最爱吃的一道菜叫什么？</div>
-            <input placeholder="请填写新答案" style={{ width:'100%', height:42, padding:'0 12px', background:'#FFFDF8', border:`1px solid ${C.border}`, borderRadius:8, fontSize:14, color:C.t1, fontFamily:'inherit', outline:'none' }}/>
+            <input placeholder="请填写新答案" value={sec.ans} onChange={e=>setSec(s=>({...s,ans:e.target.value}))} style={{ width:'100%', height:42, padding:'0 12px', background:'#FFFDF8', border:`1px solid ${C.border}`, borderRadius:8, fontSize:14, color:C.t1, fontFamily:'inherit', outline:'none' }}/>
           </div>
-          <Btn fullWidth size="lg" onClick={()=>{ setSheet(null); showToast('密保问题已更新'); }}>保存</Btn>
+          <Btn fullWidth size="lg" onClick={async()=>{ if(!sec.ans.trim()){ showToast('请填写新答案'); return; } const r = await window.api.auth.changeSecurityAnswer({ currentPassword: sec.cur, newAnswer: sec.ans }); if(!r.ok){ showToast(r.error||'修改失败'); return; } setSheet(null); setSec({cur:'',ans:''}); showToast('密保答案已更新'); }}>保存</Btn>
         </div>
       </BottomSheet>
       <BottomSheet open={sheet==='notif'} onClose={()=>setSheet(null)} title="通知设置">
@@ -2568,7 +2742,7 @@ function P51_Settings() {
       <BottomSheet open={sheet==='logout'} onClose={()=>setSheet(null)} title="退出登录">
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ fontSize:13.5, color:C.t2, lineHeight:1.8 }}>退出后需重新输入用户名和密码。你贡献的记忆都会完好保留。</div>
-          <Btn fullWidth size="lg" onClick={()=>{ setSheet(null); showToast('已退出'); setTimeout(()=>navigate('P1'),900); }}>确认退出</Btn>
+          <Btn fullWidth size="lg" onClick={async()=>{ await window.api.auth.logout(); setSheet(null); showToast('已退出'); setTimeout(()=>navigate('P1'),900); }}>确认退出</Btn>
           <Btn variant="outline" fullWidth onClick={()=>setSheet(null)}>取消</Btn>
         </div>
       </BottomSheet>
@@ -2592,16 +2766,21 @@ function P52_Family() {
   const [sheet, setSheet] = React.useState(null);
   const [codeShown, setCodeShown] = React.useState(false);
   const [editMem, setEditMem] = React.useState(null);
-  const fam = { name:'陈氏一家', code:'492178', desc:'陈志农与周桃妖的后人，扬州老宅' };
-  const filterDeceased = m => !m.deceased; // 只显示在世且已加入/申请的家人
-  const members = [
-    { id:'m1', name:'陈小明',  rel:'我',    role:'创建者', color:C.primary,  you:true },
-    { id:'m2', name:'陈丽华',  rel:'妈妈',  role:'成员',   color:'#E8C8B5', status:'claimed' },
-    { id:'m3', name:'陈建明',  rel:'爸爸',  role:'成员',   color:'#C8D8B5', status:'claimed' },
-    { id:'m4', name:'陈建华',  rel:'大伯',  role:'成员',   color:'#D4C5E0', status:'claimed' },
-    { id:'m5', name:'陈子翔',  rel:'表哥',  role:'成员',   color:'#F0DDB0', status:'claimed' },
-    { id:'m6', name:'陈建军',  rel:'二伯',  role:'待确认', color:'#D8D2C5', pending:true },
-  ];
+  const [fam, setFam] = React.useState(null);
+  const [members, setMembers] = React.useState([]);
+  const [meId, setMeId] = React.useState('');
+  React.useEffect(() => {
+    (async () => {
+      const u = (await window.sb.auth.getUser()).data.user;
+      if (u) setMeId(u.id);
+      let id = window.__famCtx && window.__famCtx.id;
+      if (!id) { const list = await window.api.family.list(); id = list[0] && list[0].id; }
+      if (!id) return;
+      setFam(await window.api.family.get(id));
+      setMembers(await window.api.family.members(id));
+    })();
+  }, []);
+  if (!fam) return null;
   return (
     <div style={{ width:'100%', height:'100%', background:C.bg, display:'flex', flexDirection:'column', position:'relative', overflow:'hidden' }}>
       <div style={{ height:44, flexShrink:0 }}/>
@@ -2609,12 +2788,12 @@ function P52_Family() {
       <div style={{ flex:1, overflowY:'auto', padding:'8px 22px 48px' }}>
         <div style={{ background:'#FFFDF8', border:`1px solid ${C.border}`, borderRadius:14, padding:'16px', marginBottom:14 }}>
           <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
-            <div style={{ width:48, height:48, borderRadius:'50%', background:C.primary, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, fontWeight:700, fontFamily:'"Noto Serif SC",serif' }}>陈</div>
+            <div style={{ width:48, height:48, borderRadius:'50%', background:C.primary, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, fontWeight:700, fontFamily:'"Noto Serif SC",serif' }}>{(fam.surname || fam.name || '家')[0]}</div>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:16, fontWeight:700, color:C.t1, fontFamily:'"Noto Serif SC",serif' }}>{fam.name}</div>
               <div style={{ fontSize:11.5, color:C.t3, marginTop:2 }}>{fam.desc}</div>
             </div>
-            <button onClick={()=>navigate('P_EditFamily')} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <button onClick={()=>{ window.__famCtx = { id: fam.id }; navigate('P_EditFamily'); }} style={{ width:32, height:32, borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M16 4l4 4-11 11H5v-4L16 4Z" stroke={C.t2} strokeWidth="1.8" strokeLinejoin="round"/></svg>
             </button>
           </div>
@@ -2624,7 +2803,6 @@ function P52_Family() {
               <div style={{ fontSize:18, color:C.t1, fontWeight:700, fontFamily:'monospace', letterSpacing:4 }}>{codeShown?fam.code:'· · · · · ·'}</div>
             </div>
             <button onClick={()=>setCodeShown(s=>!s)} style={{ fontSize:12, color:C.primary, background:'transparent', border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>{codeShown?'隐藏':'查看'}</button>
-            <button onClick={()=>setSheet('reset')} style={{ fontSize:12, color:C.t3, background:'transparent', border:'none', cursor:'pointer', fontFamily:'inherit' }}>重置</button>
           </div>
         </div>
 
@@ -2639,29 +2817,25 @@ function P52_Family() {
           <span style={{ fontSize:18 }}>›</span>
         </button>
 
-        <div style={{ fontSize:11, color:C.t3, letterSpacing:1.5, fontWeight:700, padding:'24px 6px 10px', display:'flex', justifyContent:'space-between' }}>
-          <span>家人·{members.filter(filterDeceased).length}</span>
-          <span style={{ color:C.red }}>待审核·1</span>
+        <div style={{ fontSize:11, color:C.t3, letterSpacing:1.5, fontWeight:700, padding:'24px 6px 10px' }}>
+          家人·{members.length}
         </div>
         <div style={{ background:'#FFFDF8', border:`1px solid ${C.border}`, borderRadius:14, overflow:'hidden' }}>
-          {members.filter(filterDeceased).map((m,i)=>(
-            <button key={m.id} onClick={()=>{ if(!m.you){ if(m.pending){ window.__confirmMemCtx=m; navigate('P_ConfirmMember'); } else { window.__editMemCtx=m; navigate('P_EditMember'); }; } }} disabled={m.you} style={{ width:'100%', padding:'12px 14px', background:'transparent', border:'none', borderBottom:i<members.length-1?`1px solid ${C.border}`:'none', cursor:m.you?'default':'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:12, textAlign:'left' }}>
-              <div style={{ width:38, height:38, borderRadius:'50%', background:m.color, color:C.t1, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, fontFamily:'"Noto Serif SC",serif' }}>{m.name[0]}</div>
+          {members.map((m,i)=>(
+            <div key={m.id} style={{ width:'100%', padding:'12px 14px', borderBottom:i<members.length-1?`1px solid ${C.border}`:'none', display:'flex', alignItems:'center', gap:12, textAlign:'left' }}>
+              <div style={{ width:38, height:38, borderRadius:'50%', background:C.primaryPale, color:C.t1, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, fontFamily:'"Noto Serif SC",serif' }}>{(m.name||'?')[0]}</div>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:14, color:C.t1, fontWeight:600 }}>{m.you ? m.name : (m.rel ? m.rel+'·'+m.name : m.name)}</div>
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:2 }}>
-                  <span style={{ fontSize:11, color:m.role==='创建者'?C.primary:m.pending?C.warn:C.t3, fontWeight:m.role==='创建者'?700:500 }}>{m.role}</span>
-                  {m.pending && <span style={{ fontSize:10, background:C.warnBg, color:C.warn, padding:'1px 6px', borderRadius:4, fontWeight:600 }}>点击处理</span>}
+                <div style={{ fontSize:14, color:C.t1, fontWeight:600 }}>{m.name}{m.user_id===meId ? '（我）' : ''}</div>
+                <div style={{ marginTop:2 }}>
+                  <span style={{ fontSize:11, color:m.role==='creator'?C.primary:C.t3, fontWeight:m.role==='creator'?700:500 }}>{m.role==='creator'?'创建者':'成员'}</span>
+                  {m.status==='placeholder' && <span style={{ fontSize:10, color:C.t3, marginLeft:6 }}>（待认领）</span>}
                 </div>
               </div>
-              {!m.you && <span style={{ fontSize:18, color:C.t3 }}>›</span>}
-            </button>
+            </div>
           ))}
         </div>
 
         <div style={{ marginTop:28, display:'flex', flexDirection:'column', gap:10 }}>
-          <Btn variant="outline" fullWidth onClick={()=>setSheet('transfer')}>转让创建者</Btn>
-          <Btn variant="outline" fullWidth onClick={()=>setSheet('quit')}>退出该家族</Btn>
         </div>
       </div>
 
@@ -2681,7 +2855,7 @@ function P52_Family() {
           <div style={{ background:C.primaryPale, borderRadius:10, padding:'10px 18px', fontSize:22, color:C.primaryDark, fontWeight:700, fontFamily:'monospace', letterSpacing:6 }}>{fam.code}</div>
           <div style={{ fontSize:12, color:C.t3 }}>把代码发给家人，他们填入后即可加入。</div>
           <div style={{ display:'flex', gap:10, width:'100%' }}>
-            <Btn variant="outline" onClick={()=>showToast('代码已复制')} xstyle={{flex:1}}>复制代码</Btn>
+            <Btn variant="outline" onClick={async()=>{ const c=fam.code||''; try{await navigator.clipboard.writeText(c);}catch(e){ const t=document.createElement('textarea'); t.value=c; document.body.appendChild(t); t.select(); try{document.execCommand('copy');}catch(_){} document.body.removeChild(t); } showToast('代码已复制'); }} xstyle={{flex:1}}>复制代码</Btn>
             <Btn onClick={()=>showToast('分享到微信')} xstyle={{flex:1}}>系统分享</Btn>
           </div>
         </div>
@@ -3523,7 +3697,7 @@ function P_Register() {
   const { navigate, showToast } = useApp();
   const [reg, setReg] = React.useState({ username:'', password:'', confirm:'', nickname:'', secA1:'', secA2:'', agreed:false });
   const [regErr, setRegErr] = React.useState({});
-  function handleReg() {
+  async function handleReg() {
     const e = {};
     if (!reg.username.trim()) e.username = '用户名不能为空';
     else if (!/^[a-zA-Z0-9_]{3,20}$/.test(reg.username)) e.username = '3-20位字母数字下划线';
@@ -3534,7 +3708,15 @@ function P_Register() {
     if (!reg.agreed) e.agreed = '请同意协议';
     setRegErr(e);
     if (Object.keys(e).length) return;
-    showToast('注册成功！'); navigate(-1);
+    const { error } = await window.api.auth.register({
+      username: reg.username, password: reg.password, nickname: reg.nickname, securityAnswer: reg.secA1
+    });
+    if (error) {
+      showToast(/already|registered|exists/i.test(error.message) ? '该用户名已被注册' : (error.message || '注册失败'));
+      return;
+    }
+    showToast('注册成功，欢迎加入一家食光！');
+    navigate('P2');
   }
   return (
     <div style={{ width:'100%', height:'100%', background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -3754,11 +3936,18 @@ function P_Notifications() {
 // ══════════════════════════════════════════════════
 function P_EditFamily() {
   const { navigate, showToast } = useApp();
-  const [info, setInfo] = React.useState({
-    name: '陈氏一家',
-    surname: '陈',
-    desc: '陈志农与周桃妖的后人，扬州老宅',
-  });
+  const [info, setInfo] = React.useState({ name:'', surname:'', desc:'' });
+  const [famId, setFamId] = React.useState(window.__famCtx && window.__famCtx.id);
+  React.useEffect(() => {
+    (async () => {
+      let id = window.__famCtx && window.__famCtx.id;
+      if (!id) { const list = await window.api.family.list(); id = list[0] && list[0].id; }
+      if (!id) return;
+      setFamId(id);
+      const f = await window.api.family.get(id);
+      if (f) setInfo({ name: f.name||'', surname: f.surname||'', desc: f.description||'' });
+    })();
+  }, []);
   return (
     <div style={{ width:'100%', height:'100%', background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ height:44, flexShrink:0 }}/>
@@ -3777,7 +3966,7 @@ function P_EditFamily() {
           <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:6 }}>家族简介</div>
           <textarea value={info.desc} onChange={e=>setInfo(i=>({...i,desc:e.target.value}))} rows={3} placeholder="简单介绍一下这个家族……" style={{ width:'100%', boxSizing:'border-box', border:'1px solid '+C.border, borderRadius:10, padding:'10px 12px', fontSize:13.5, color:C.t1, fontFamily:'inherit', background:'#FFFDF8', outline:'none', resize:'none', lineHeight:1.75 }}/>
         </div>
-        <Btn fullWidth size="lg" disabled={!info.name.trim()||!info.surname.trim()} onClick={()=>{ showToast('家族信息已保存'); navigate(-1); }}>保存</Btn>
+        <Btn fullWidth size="lg" disabled={!info.name.trim()||!info.surname.trim()} onClick={async()=>{ const r = await window.api.family.edit(famId, { name:info.name.trim(), surname:info.surname.trim(), description:info.desc.trim() }); if(!r.ok){ showToast(r.error||'保存失败'); return; } showToast('家族信息已保存'); navigate(-1); }}>保存</Btn>
 
       </div>
     </div>
