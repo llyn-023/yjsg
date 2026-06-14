@@ -14,6 +14,8 @@
 
 <p align="center">
   <img src="screenshots/01-welcome.png" alt="一家食光 · 开屏" width="240" />
+    <img src="screenshots/03-taste-table.png" alt="味道桌" width="240" />
+    <img src="screenshots/04-family-tree.png" alt="家谱树" width="240" />
 </p>
 
 ---
@@ -177,7 +179,6 @@
 味道只是钩子。**真正被打捞上来、被留下的，是人，是情。**
 
 <p align="center">
-  <img src="screenshots/03-taste-table.png" alt="味道桌" width="240" />
 </p>
 
 ---
@@ -199,6 +200,8 @@
 
 3. **被温柔地问。** AI 没有冷冰冰地索要信息，它说："外婆的红烧肉！这个好——你脑海里第一个冒出来的画面，大概是什么时候、在哪儿的事儿呀？" 小雨说"在外婆家"。AI 知道家谱里记着外婆的籍贯，于是顺势接："外婆家是在扬州那边吧？我记得你家好像是扬州的。"——小雨只需点头。
 
+  <img src="screenshots/06-ai-chat.png" alt="AI 记忆挖掘对话" width="240" />
+  
 4. **它懂得在什么时候停下来。** 当小雨打出"外婆走了以后就再也没人做了"，AI 没有追问、没有空洞地安慰，只是轻轻地说："……嗯。有些味道就是跟着人走的。但你还记得，这就够了。"
 
 5. **整理成时光。** 对话结束，AI 把那些零碎的画面，整理成一篇带插画的"记忆瞬间"，端端正正地落在家谱上"外婆"的名下。
@@ -206,6 +209,7 @@
 <p align="center">
   <img src="screenshots/07-story-generating.jpg" alt="AI 正在把碎片串成故事" width="240" />
   <img src="screenshots/08-recipe-detail.png" alt="AI 生成的菜谱与家人的补述" width="240" />
+  <img src="screenshots/09-time-capsule.png" alt="时间胶囊" width="240" />
 </p>
 
 6. **回声响起。** 妈妈收到提醒——"女儿补充了红烧肉的故事"；而堂兄陈子翔收到的，却是"堂妹补充了红烧肉的故事"。妈妈可以来补上她记得的细节，作为另一个并排的视角。一道原本灰色的、"还有人在等"的菜，就这样被一家人合力点亮了。
@@ -245,7 +249,6 @@
 这不是一个技术约束，这是我们对一个正在回忆逝者的人，最基本的体面与温柔。
 
 <p align="center">
-  <img src="screenshots/06-ai-chat.png" alt="AI 记忆挖掘对话" width="240" />
 </p>
 
 ---
@@ -266,7 +269,7 @@
 - **同一个动作，每个人看到的称呼都不一样。** 妈妈补充了一道菜：哥哥收到的是"妈妈补充了…"，堂弟收到的是"婶婶补充了…"，外婆收到的是"女儿补充了…"。每个人都站在自己的视角，看到属于自己的那声称呼。
 
 <p align="center">
-  <img src="screenshots/04-family-tree.png" alt="家谱树" width="240" />
+
 </p>
 
 ---
@@ -327,7 +330,6 @@
 - 收到的胶囊一旦开启，会**自动转化为自己味道桌上的一道菜**——让一份馈赠，真正落地成为传承。
 
 <p align="center">
-  <img src="screenshots/09-time-capsule.png" alt="时间胶囊" width="240" />
 </p>
 
 ---
