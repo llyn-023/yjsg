@@ -527,7 +527,7 @@ node scripts/smoke.mjs
 ---
 
 ## 运行指南（Usage / How to Run）
-### 在线体验（最快）
+### 在线体验（最快）(手机浏览器打开)
 
 运行链接： http://124.223.167.6:4000
 测试账号： Renee  密码： renee123
