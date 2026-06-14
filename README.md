@@ -322,7 +322,7 @@
 - 收到的胶囊一旦开启，会**自动转化为自己味道桌上的一道菜**——让一份馈赠，真正落地成为传承。
 
 <p align="center">
-  <img src="screenshots/09-time-capsule.png" alt="时间胶囊" width="240" />
+
 </p>
 
 ---
