@@ -14,7 +14,7 @@
 
 <p align="center">
   <img src="screenshots/01-welcome.png" alt="一家食光 · 开屏" width="240" />
-    <img src="screenshots/03-taste-table.png" alt="味道桌" width="240" />
+   <img width="854" height="1844" alt="3151b0afa27c2c38e204a15ba5d2c64f_720" src="https://github.com/user-attachments/assets/d4d637cb-2c8a-4439-81af-9efca207a22c" />
     <img src="screenshots/04-family-tree.png" alt="家谱树" width="240" />
 </p>
 
@@ -209,13 +209,15 @@
 <p align="center">
   <img src="screenshots/07-story-generating.jpg" alt="AI 正在把碎片串成故事" width="240" />
   <img src="screenshots/08-recipe-detail.png" alt="AI 生成的菜谱与家人的补述" width="240" />
-  <img src="screenshots/09-time-capsule.png" alt="时间胶囊" width="240" />
+  <img width="670" height="1448" alt="85504e78fde9891a255a381dca49fcaf_720" src="https://github.com/user-attachments/assets/3020e1d3-6914-48f6-a9f2-cbdea749bd14" />
+
 </p>
 
 6. **回声响起。** 妈妈收到提醒——"女儿补充了红烧肉的故事"；而堂兄陈子翔收到的，却是"堂妹补充了红烧肉的故事"。妈妈可以来补上她记得的细节，作为另一个并排的视角。一道原本灰色的、"还有人在等"的菜，就这样被一家人合力点亮了。
 
 <p align="center">
-  <img src="screenshots/05-activity-feed.png" alt="家庭动态：家里近来怎么样" width="240" />
+<img width="871" height="1806" alt="49b46a392f84645918796b2873976324" src="https://github.com/user-attachments/assets/2d339968-b6e3-4c83-b948-a33b22952676" />
+
 </p>
 
 这，就是"食有来处，家有回声"。
