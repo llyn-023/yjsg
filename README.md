@@ -209,8 +209,8 @@
 6. **回声响起。** 妈妈收到提醒——"女儿补充了红烧肉的故事"；而堂兄陈子翔收到的，却是"堂妹补充了红烧肉的故事"。妈妈可以来补上她记得的细节，作为另一个并排的视角。一道原本灰色的、"还有人在等"的菜，就这样被一家人合力点亮了。
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/2d339968-b6e3-4c83-b948-a33b22952676" alt="家庭动态：家里近来怎么样" width="240" />
-  <img src="https://github.com/user-attachments/assets/3020e1d3-6914-48f6-a9f2-cbdea749bd14" alt="AI 整理后的记忆时光" width="240" />
+  <img src="https://github.com/user-attachments/assets/2d339968-b6e3-4c83-b948-a33b22952676" alt="家庭动态：家里近来怎么样" height="380" />
+  <img src="https://github.com/user-attachments/assets/3020e1d3-6914-48f6-a9f2-cbdea749bd14" alt="AI 整理后的记忆时光" height="380" />
 </p>
 
 这，就是"食有来处，家有回声"。
