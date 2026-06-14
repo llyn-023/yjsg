@@ -196,11 +196,7 @@
 2. **点亮一道味道。** 她在味道桌点开"＋"，敲下三个字：外婆的红烧肉。
 
 3. **被温柔地问。** AI 没有冷冰冰地索要信息，它说："外婆的红烧肉！这个好——你脑海里第一个冒出来的画面，大概是什么时候、在哪儿的事儿呀？" 小雨说"在外婆家"。AI 知道家谱里记着外婆的籍贯，于是顺势接："外婆家是在扬州那边吧？我记得你家好像是扬州的。"——小雨只需点头。
-
-<p align="center">
-  <img src="screenshots/06-ai-chat.png" alt="AI 记忆挖掘对话" width="240" />
-</p>
-
+   
 4. **它懂得在什么时候停下来。** 当小雨打出"外婆走了以后就再也没人做了"，AI 没有追问、没有空洞地安慰，只是轻轻地说："……嗯。有些味道就是跟着人走的。但你还记得，这就够了。"
 
 5. **整理成时光。** 对话结束，AI 把那些零碎的画面，整理成一篇带插画的"记忆瞬间"，端端正正地落在家谱上"外婆"的名下。
@@ -208,13 +204,13 @@
 <p align="center">
   <img src="screenshots/07-story-generating.jpg" alt="AI 正在把碎片串成故事" width="240" />
   <img src="screenshots/08-recipe-detail.png" alt="AI 生成的菜谱与家人的补述" width="240" />
-  <img src="https://github.com/user-attachments/assets/3020e1d3-6914-48f6-a9f2-cbdea749bd14" alt="AI 整理后的记忆时光" width="240" />
 </p>
 
 6. **回声响起。** 妈妈收到提醒——"女儿补充了红烧肉的故事"；而堂兄陈子翔收到的，却是"堂妹补充了红烧肉的故事"。妈妈可以来补上她记得的细节，作为另一个并排的视角。一道原本灰色的、"还有人在等"的菜，就这样被一家人合力点亮了。
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/2d339968-b6e3-4c83-b948-a33b22952676" alt="家庭动态：家里近来怎么样" width="240" />
+    <img src="https://github.com/user-attachments/assets/3020e1d3-6914-48f6-a9f2-cbdea749bd14" alt="AI 整理后的记忆时光" width="240" />
 </p>
 
 这，就是"食有来处，家有回声"。
