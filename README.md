@@ -13,9 +13,9 @@
 ![ai](https://img.shields.io/badge/AI-%E6%99%BA%E8%B0%B1%20GLM--5.1-purple)
 
 <p align="center">
-  <img src="screenshots/01-welcome.png" alt="一家食光 · 开屏" width="240" />
-  <img src="https://github.com/user-attachments/assets/d4d637cb-2c8a-4439-81af-9efca207a22c" alt="一家食光 · 味道桌总览" width="240" />
-  <img src="screenshots/04-family-tree.png" alt="家谱树" width="240" />
+  <img src="screenshots/01-welcome.png" alt="一家食光 · 开屏" height="400" />
+  <img src="https://github.com/user-attachments/assets/d4d637cb-2c8a-4439-81af-9efca207a22c" alt="一家食光 · 味道桌总览" height="400" />
+  <img src="screenshots/04-family-tree.png" alt="家谱树" height="400" />
 </p>
 
 ---
@@ -189,8 +189,8 @@
 1. **入伙。** 小雨用 6 位家族代码加入了"陈氏一家人"，在家谱上"钉"下自己的位置——她只点了一下"陈小云 是我的 父亲"。系统瞬间算出：李芳是她妈妈、陈建国是她爷爷、陈红是她姑姑、陈子翔是她堂兄……
 
 <p align="center">
-  <img src="screenshots/02-find-family.png" alt="找到你的家族" width="240" />
-  <img src="screenshots/10-family-manage.png" alt="家族管理" width="240" />
+  <img src="screenshots/02-find-family.png" alt="找到你的家族" height="400" />
+  <img src="screenshots/10-family-manage.png" alt="家族管理" height="400" />
 </p>
 
 2. **点亮一道味道。** 她在味道桌点开"＋"，敲下三个字：外婆的红烧肉。
@@ -202,15 +202,15 @@
 5. **整理成时光。** 对话结束，AI 把那些零碎的画面，整理成一篇带插画的"记忆瞬间"，端端正正地落在家谱上"外婆"的名下。
 
 <p align="center">
-  <img src="screenshots/07-story-generating.jpg" alt="AI 正在把碎片串成故事" width="240" />
-  <img src="screenshots/08-recipe-detail.png" alt="AI 生成的菜谱与家人的补述" width="240" />
+  <img src="screenshots/07-story-generating.jpg" alt="AI 正在把碎片串成故事" height="400" />
+  <img src="screenshots/08-recipe-detail.png" alt="AI 生成的菜谱与家人的补述" height="400" />
 </p>
 
 6. **回声响起。** 妈妈收到提醒——"女儿补充了红烧肉的故事"；而堂兄陈子翔收到的，却是"堂妹补充了红烧肉的故事"。妈妈可以来补上她记得的细节，作为另一个并排的视角。一道原本灰色的、"还有人在等"的菜，就这样被一家人合力点亮了。
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/2d339968-b6e3-4c83-b948-a33b22952676" alt="家庭动态：家里近来怎么样" height="380" />
-  <img src="https://github.com/user-attachments/assets/3020e1d3-6914-48f6-a9f2-cbdea749bd14" alt="AI 整理后的记忆时光" height="380" />
+  <img src="https://github.com/user-attachments/assets/2d339968-b6e3-4c83-b948-a33b22952676" alt="家庭动态：家里近来怎么样" height="400" />
+  <img src="https://github.com/user-attachments/assets/3020e1d3-6914-48f6-a9f2-cbdea749bd14" alt="AI 整理后的记忆时光" height="400" />
 </p>
 
 这，就是"食有来处，家有回声"。
