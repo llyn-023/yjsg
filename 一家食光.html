@@ -933,11 +933,16 @@
       let convQ = window.sb.from('conversations').select('id,title,type,status,created_at').eq('user_id', u.id).order('updated_at', { ascending: false }).limit(20);
       if (familyId) convQ = convQ.eq('family_id', familyId);
       const { data: conversations } = await convQ;
+      // 我的已点亮记忆（当前家族）——供 P50「我的记忆」点开查看；家族切换时随 familyId 变化
+      let mineQ = window.sb.from('anchors').select('id,name,era,city,img_url,created_at').eq('created_by', u.id).eq('status', 'lit').order('created_at', { ascending: false });
+      if (familyId) mineQ = mineQ.eq('family_id', familyId);
+      const { data: myMems } = await mineQ;
       return {
         profile: profile?.data,
         memCount: memCount || 0,
         litCount: litCount || 0,
         draftCount: draftCount || 0,
+        myMems: myMems || [],
         conversations: conversations || [],
         memberNodes: await window.sb.from('family_members').select('id,family_id,name,role,status').eq('user_id', u.id).then(r => r.data || []),
       };
@@ -1942,10 +1947,13 @@ function P10_Home() {
         window.api.family.members(famId)
       ]);
       setAnchorsLit(lit);
-      setAnchorsGray(gray);
+      // Bug3：已被点亮（存在同名 lit）的「待讲」，从「还有人在等」中移除
+      const litNames = new Set((lit || []).map(a => (a.name || '').trim()).filter(Boolean));
+      const grayOpen = (gray || []).filter(g => !litNames.has((g.name || '').trim()));
+      setAnchorsGray(grayOpen);
       setMembers(mems);
       setLitCount(lit.length);
-      setGrayCount(gray.length);
+      setGrayCount(grayOpen.length);
     } catch (err) {
       console.error('[P10] 加载数据失败:', err);
     } finally {
@@ -2132,7 +2140,7 @@ function P10_Home() {
       <BottomSheet open={sheet==='gray'} onClose={()=>setSheet(null)} title={grayPick?.name||''}>
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           <div style={{ background:C.warnBg, border:`1px solid ${C.warnBdr}`, borderRadius:12, padding:'12px 14px', fontSize:13, color:C.warn, lineHeight:1.8 }}>这道还没人讲过。<strong>{grayPick?.who}</strong>。你来讲讲？</div>
-          <Btn fullWidth size="lg" onClick={()=>{ window.__p30ctx={ type:'anchor', name:grayPick?.name||'', tag:grayPick?.tag }; setSheet(null); navigate('P30'); }}>我来讲 ›</Btn>
+          <Btn fullWidth size="lg" onClick={()=>{ window.__p30ctx={ type:'anchor', name:grayPick?.name||'', tag:grayPick?.tag, anchorId:grayPick?.id, grayId:grayPick?.id }; setSheet(null); navigate('P30'); }}>我来讲 ›</Btn>
           <Btn fullWidth variant="outline" onClick={()=>setSheet('forward')}>转给家人</Btn>
           <div style={{ height:1, background:C.border, margin:'4px 0' }}/>
           <div style={{ display:'flex', gap:10 }}>
@@ -2314,7 +2322,7 @@ function P30_Chat() {
     const res = await window.api.ai.generateStory(convId, { family_name: agentCtx.current.family_name || '' });
     setGenerating(false);
     if (res && res.ok && res.story) {
-      window.__p31ctx = { story: res.story, storyId: res.story_id, conversationId: convId, familyId, img: attachedImg || null };
+      window.__p31ctx = { story: res.story, storyId: res.story_id, conversationId: convId, familyId, img: attachedImg || null, hookName: ctx.current.name || '', grayId: ctx.current.grayId || null };
       sessionStorage.setItem('p31ctx', JSON.stringify(window.__p31ctx));
       navigate('P31');
     } else {
@@ -2510,7 +2518,7 @@ function P31_Story() {
   const [members, setMembers] = React.useState([]);
 
   const storyData = {
-    name: (story.food && story.food.name) || '未知',
+    name: (story.food && story.food.name) || p30ctx.hookName || '未知',
     img: p30ctx.img || (FOOD_POOL && FOOD_POOL[0]) || MOCK_FOOD_IMG,
     by: byName,
     era: (story.scene && story.scene.era) || '1900',
@@ -2562,6 +2570,8 @@ function P31_Story() {
     for (const g of grays) {
       await window.api.anchor.create({ familyId: fid, name: g.food_name, byMember, status: 'gray', grayLabel: g.suggested_person || g.source || '还有人在等' });
     }
+    // Bug3：本次点亮来自某个灰锚点（待讲）→ 移除原灰锚点（best-effort；跨用户由 P10 同名过滤兜底）
+    if (p30ctx.grayId) { try { await window.api.anchor.remove(p30ctx.grayId); } catch(e){} }
     if (p30ctx.conversationId) { try { await window.api.conversation.update(p30ctx.conversationId, { status:'done' }); window.__statsDirty = Date.now(); } catch(e){} }
     setBusy(false);
     window.__p11ctx = { id: res.anchor.id };
@@ -3719,19 +3729,20 @@ function P50_Me() {
   const [fams, setFams] = React.useState([]);
   const [msgs, setMsgs] = React.useState([]);
   const [members, setMembers] = React.useState([]);
-  const curFamId = (window.__famCtx && window.__famCtx.id) || null;
-  const [lastStatsRefresh, setLastRefresh] = React.useState(0);
-  React.useEffect(()=>{ (async()=>{
-    // 如果页面挂载/重入时 stats 被标记为脏（草稿增删等），或首次加载，重新拉取
-    if (window.__statsDirty && lastStatsRefresh && window.__statsDirty <= lastStatsRefresh) return;
-    const fid = curFamId || (await window.api.family.list().then(l => l[0]?.id));
+  const [activeFamId, setActiveFamId] = React.useState((window.__famCtx && window.__famCtx.id) || null);
+  const curFamId = activeFamId;
+  // 按家族加载（统计/记忆/通知随当前家族变化）——切换家族时复用
+  const reload = React.useCallback(async (famId) => {
+    const fid = famId || (await window.api.family.list().then(l => l[0]?.id));
+    setActiveFamId(fid || null);
     const [s, fl, nl] = await Promise.all([ window.api.me.stats(fid), window.api.family.list(), window.api.notif.list(30) ]);
     setStats(s);
-    const now = Date.now(); window.__statsDirty = null; setLastRefresh(now);
-    setFams((fl||[]).map(f => ({ id:f.id, name:f.name, initial:(f.surname||f.name||'家')[0], role:f.role, cur: curFamId ? f.id===curFamId : false })));
+    window.__statsDirty = null;
+    setFams((fl||[]).map(f => ({ id:f.id, name:f.name, surname:f.surname, initial:(f.surname||f.name||'家')[0], role:f.role, cur: fid ? f.id===fid : false })));
     setMsgs((nl||[]).map(n => ({ id:n.id, kind:({join:'加入申请',claim:'认领结果',comment:'新补述',light:'点亮',capsule:'时间胶囊',poke:'被戳一下'})[n.type]||'通知', t:n.title, sub:n.sub, when:relTime(n.created_at), unread:!n.read })));
     if (fid) { const g = await window.api.family.graph(fid); setMembers(g.members||[]); }
-  })(); /* eslint-disable-next-line */ }, []);
+  }, []);
+  React.useEffect(()=>{ reload((window.__famCtx && window.__famCtx.id) || null); /* eslint-disable-next-line */ }, []);
   const me = {
     name: (stats && stats.profile && (stats.profile.nickname || stats.profile.username)) || '我',
     alias: ((stats && stats.profile && (stats.profile.nickname || stats.profile.username)) || '我')[0],
@@ -3776,21 +3787,23 @@ function P50_Me() {
         <div style={{ padding:'0 22px', display:'flex', flexDirection:'column', gap:8 }}>
           {fams.map(f=>(
             <div key={f.id} style={{ padding:'12px 14px', background:f.cur?C.primaryPale:'#FFFDF8', border:`1.5px solid ${f.cur?C.primary:C.border}`, borderRadius:12, display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ width:36, height:36, borderRadius:'50%', background:C.primary, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, fontFamily:'"Noto Serif SC",serif' }}>{f.initial}</div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:14, fontWeight:600, color:C.t1 }}>{f.name}</div>
-                <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>{f.role}{f.cur && ' · 当前'}</div>
-              </div>
-              <button onClick={()=>{ window.__famCtx={ id:f.id }; navigate('P52'); }} style={{ fontSize:12, color:C.t2, background:'transparent', border:`1px solid ${C.border}`, padding:'5px 10px', borderRadius:9999, cursor:'pointer', fontFamily:'inherit' }}>管理</button>
+              <button onClick={()=>{ if(!f.cur){ window.__famCtx={ id:f.id }; reload(f.id); showToast('已切换到「'+f.name+'」'); } }} style={{ flex:1, display:'flex', alignItems:'center', gap:12, background:'transparent', border:'none', cursor:'pointer', fontFamily:'inherit', textAlign:'left', padding:0, minWidth:0 }}>
+                <div style={{ width:36, height:36, borderRadius:'50%', background:C.primary, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, fontFamily:'"Noto Serif SC",serif', flexShrink:0 }}>{f.initial}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:600, color:C.t1 }}>{f.name}</div>
+                  <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>{f.role}{f.cur ? ' · 当前' : ' · 点此切换'}</div>
+                </div>
+              </button>
+              <button onClick={()=>{ window.__famCtx={ id:f.id }; navigate('P52'); }} style={{ fontSize:12, color:C.t2, background:'transparent', border:`1px solid ${C.border}`, padding:'5px 10px', borderRadius:9999, cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>管理</button>
             </div>
           ))}
           {fams.length===0 && <div style={{ padding:'14px', textAlign:'center', fontSize:13, color:C.t4 }}>还没有加入任何家族</div>}
         </div>
 
         <div style={{ padding:'18px 22px 8px', display:'flex', gap:10 }}>
-          <button onClick={()=>showToast('我的记忆列表')} style={{ flex:1, padding:'14px', background:'#FFFDF8', border:`1px solid ${C.border}`, borderRadius:12, cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
-            <div style={{ fontSize:22, fontWeight:800, color:C.t1, fontFamily:'"Noto Serif SC",serif' }}>{me.mems}</div>
-            <div style={{ fontSize:11.5, color:C.t3, marginTop:3 }}>我的记忆</div>
+          <button onClick={()=>setSheet('myMems')} style={{ flex:1, padding:'14px', background:'#FFFDF8', border:`1px solid ${C.border}`, borderRadius:12, cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
+            <div style={{ fontSize:22, fontWeight:800, color:C.t1, fontFamily:'"Noto Serif SC",serif' }}>{(stats && stats.myMems || []).length}</div>
+            <div style={{ fontSize:11.5, color:C.t3, marginTop:3 }}>我的记忆 ›</div>
           </button>
           <button onClick={()=>navigate('P_Drafts')} style={{ flex:1, padding:'14px', background:'#FFFDF8', border:`1px solid ${C.border}`, borderRadius:12, cursor:'pointer', fontFamily:'inherit', textAlign:'left', position:'relative' }}>
             <div style={{ fontSize:22, fontWeight:800, color:C.t1, fontFamily:'"Noto Serif SC",serif' }}>{me.dft}</div>
@@ -3831,6 +3844,23 @@ function P50_Me() {
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:14, fontWeight:600, color:C.t1 }}>{opt.t}</div>
                 <div style={{ fontSize:11.5, color:C.t3, marginTop:2 }}>{opt.s}</div>
+              </div>
+              <span style={{ fontSize:18, color:C.t3 }}>›</span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={sheet==='myMems'} onClose={()=>setSheet(null)} title="我的已点亮记忆">
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ fontSize:12, color:C.t3 }}>{(fams.find(f=>f.cur)||{}).name || '本家族'} · 共 {(stats && stats.myMems || []).length} 道</div>
+          {(stats && stats.myMems || []).length === 0 && <div style={{ padding:'18px', textAlign:'center', fontSize:13, color:C.t4 }}>这个家族里你还没有点亮的记忆</div>}
+          {(stats && stats.myMems || []).map(a => (
+            <button key={a.id} onClick={()=>{ window.__p11ctx={ id:a.id }; setSheet(null); navigate('P11'); }} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'#FFFDF8', border:`1px solid ${C.border}`, borderRadius:12, cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
+              <div style={{ width:44, height:44, borderRadius:10, overflow:'hidden', background:C.inputBg, flexShrink:0 }}>{a.img_url ? <img src={a.img_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/> : null}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:14, fontWeight:600, color:C.t1, fontFamily:'"Noto Serif SC",serif' }}>{a.name}</div>
+                <div style={{ fontSize:11, color:C.t3, marginTop:2 }}>{[a.era, a.city].filter(Boolean).join(' · ') || '已点亮'}</div>
               </div>
               <span style={{ fontSize:18, color:C.t3 }}>›</span>
             </button>
@@ -4220,7 +4250,7 @@ function P52_Family() {
       </BottomSheet>
 
       <BottomSheet open={sheet==='confirmMem'} onClose={()=>{ setSheet(null); setEditMem(null); }} title="审核加入申请">
-        {editMem && <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        {sheet==='confirmMem' && editMem && <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ display:'flex', alignItems:'center', gap:12, background:C.warnBg, border:'1px solid '+C.warnBdr, borderRadius:12, padding:'12px 14px' }}>
             <div style={{ width:44, height:44, borderRadius:'50%', background:C.primaryPale, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:700, fontFamily:'"Noto Serif SC",serif', color:C.t1, flexShrink:0 }}>{editMem.applicantName[0]}</div>
             <div style={{ flex:1 }}>
@@ -4263,7 +4293,7 @@ function P52_Family() {
       </BottomSheet>
 
       <BottomSheet open={sheet==='editMem52'} onClose={()=>setSheet(null)} title="编辑家人资料">
-        {editMem && <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        {sheet==='editMem52' && editMem && <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ display:'flex', alignItems:'center', gap:12, padding:'4px 0 10px' }}>
             <div style={{ width:48, height:48, borderRadius:'50%', background:editMem.color||C.primaryPale, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, fontWeight:700, fontFamily:'"Noto Serif SC",serif', color:C.t1 }}>{editMem.name[0]}</div>
             <div>
@@ -4689,12 +4719,41 @@ function P62_Capsule() {
   const { navigate, showToast } = useApp();
   const [sheet, setSheet] = React.useState(null);
   const [picked, setPicked] = React.useState(null);
-  const [form, setForm] = React.useState({ name:'', whenY:'2030', whenM:'1', whenD:'1', to:'女儿·陈小豆', items:[] });
-  const CAPS = [
-    { id:'c1', name:'给女儿十八岁的老味道', to:'女儿·陈小豆', open:'2030年9月12日', days:1572, state:'sealed', img:MOCK_FOOD_IMG },
-    { id:'c2', name:'给妹妹的三代菜谱', to:'妹妹·陈小雨', open:'2028年3月5日', days:632, state:'sealed', img:MOCK_FOOD_IMG },
-    { id:'c3', name:'我留给全家的一封话', to:'全家', open:'2026年6月1日', days:0, state:'open', img:MOCK_FOOD_IMG },
-  ];
+  const [form, setForm] = React.useState({ name:'', whenY:'2030', whenM:'1', whenD:'1', to:[], items:[] });
+  const [caps, setCaps] = React.useState([]);
+  const [members, setMembers] = React.useState([]);
+  const famIdRef = React.useRef(null);
+  const fmtDate = (s) => { if (!s) return ''; const p = String(s).split('-'); return p.length>=3 ? `${p[0]}年${Number(p[1])}月${Number(p[2])}日` : String(s); };
+  const loadCaps = React.useCallback(async () => {
+    let fid = (window.__famCtx && window.__famCtx.id) || null;
+    if (!fid) { const fams = await window.api.family.list(); fid = fams[0] && fams[0].id; }
+    famIdRef.current = fid;
+    if (!fid) return;
+    const [list, mems] = await Promise.all([ window.api.capsule.list(fid), window.api.family.members(fid) ]);
+    setMembers(mems || []);
+    const nameOf = (id) => (mems || []).find(m => m.id === id)?.name || '家人';
+    const today = new Date(); today.setHours(0,0,0,0);
+    setCaps((list || []).map(c => {
+      const od = c.open_date ? new Date(c.open_date + 'T00:00:00') : null;
+      const days = od ? Math.max(0, Math.ceil((od - today) / 86400000)) : 0;
+      const toArr = Array.isArray(c.to_members) ? c.to_members : [];
+      const to = toArr.length ? toArr.map(nameOf).join('、') : '全家';
+      const state = c.state === 'open' ? 'open' : 'sealed';
+      return { id:c.id, name:c.name || '一段记忆', to, open:fmtDate(c.open_date), days, state, img:c.img_url || MOCK_FOOD_IMG, text:c.text || '' };
+    }));
+  }, []);
+  React.useEffect(()=>{ loadCaps(); /* eslint-disable-next-line */ }, []);
+  // 真实封存（P62 内新建入口）：写库 → 刷新列表
+  async function createCapsule() {
+    const fid = famIdRef.current;
+    if (!fid) { showToast('缺少家族上下文'); return; }
+    if (!form.name.trim()) { showToast('请先填写胶囊名字'); return; }
+    const openDate = `${form.whenY}-${String(form.whenM).padStart(2,'0')}-${String(form.whenD).padStart(2,'0')}`;
+    const r = await window.api.capsule.create({ familyId:fid, name:form.name.trim(), openDate, toMembers:Array.isArray(form.to)?form.to:[] });
+    if (r.ok) { setSheet(null); setForm({ name:'', whenY:'2030', whenM:'1', whenD:'1', to:[], items:[] }); showToast('已封存'); await loadCaps(); }
+    else showToast('封存失败：'+(r.error||''));
+  }
+  const CAPS = caps;
   return (
     <div style={{ width:'100%', height:'100%', background:C.bg, display:'flex', flexDirection:'column', position:'relative', overflow:'hidden' }}>
       <div style={{ height:44, flexShrink:0 }}/>
@@ -4802,19 +4861,20 @@ function P62_Capsule() {
           <div>
             <div style={{ fontSize:13, fontWeight:600, color:C.t2, marginBottom:8 }}>送给谁（可多选）</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-              {['全家','女儿·陈小豆','妹妹·陈小雨','表哥的孩子'].map(p=>{
-                const sel = Array.isArray(form.to) && form.to.includes(p);
-                return <button key={p} onClick={()=>setForm(f=>{ const arr=Array.isArray(f.to)?f.to:[f.to]; const next=arr.includes(p)?arr.filter(x=>x!==p):[...arr,p]; return {...f,to:next}; })} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:'1.5px solid '+(sel?C.primary:C.border), color:sel?'#fff':C.t1, fontSize:12.5, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:5 }}>
+              {members.map(m=>{
+                const sel = Array.isArray(form.to) && form.to.includes(m.id);
+                return <button key={m.id} onClick={()=>setForm(f=>{ const arr=Array.isArray(f.to)?f.to:[]; const next=arr.includes(m.id)?arr.filter(x=>x!==m.id):[...arr,m.id]; return {...f,to:next}; })} style={{ height:34, padding:'0 14px', borderRadius:9999, background:sel?C.primary:'transparent', border:'1.5px solid '+(sel?C.primary:C.border), color:sel?'#fff':C.t1, fontSize:12.5, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:5 }}>
                   {sel && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                  {p}
+                  {m.name}
                 </button>;
               })}
+              {members.length===0 && <span style={{ fontSize:12, color:C.t3 }}>不选 = 送给全家</span>}
             </div>
           </div>
           <button onClick={()=>showToast('选择记忆·已选 0 件')} style={{ padding:'14px 16px', background:'transparent', border:`1.5px dashed ${C.border}`, borderRadius:10, cursor:'pointer', fontFamily:'inherit', fontSize:13, color:C.t2, textAlign:'left', display:'flex', justifyContent:'space-between' }}>
             <span>挑选要封存的记忆</span><span style={{ color:C.t3 }}>从锚点中选 ›</span>
           </button>
-          <Btn fullWidth size="lg" disabled={!form.name.trim()} onClick={()=>{ setSheet(null); showToast('已封存'); }}>封存</Btn>
+          <Btn fullWidth size="lg" disabled={!form.name.trim()} onClick={createCapsule}>封存</Btn>
         </div>
       </BottomSheet>
     </div>

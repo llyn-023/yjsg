@@ -21,3 +21,11 @@ Thumbs.db
 # 日志
 *.log
 npm-debug.log*
+
+# 录制 / 调试产物（可由 scripts/record 重新生成，不入库）
+scripts/record/out/
+scripts/record/shots/
+scripts/record/frames/
+scripts/record/verify/
+*.mp4
+*.webm
