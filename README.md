@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/28920948/README.md)
 # 一家食光 · Tastes of Home
 
 > **食有来处，家有回声**
@@ -8,8 +7,10 @@
 一款由 AI 驱动的家族味觉记忆 App：用一个温暖的"AI 家人"陪你把每道家常菜背后的故事讲出来，自动整理成带插画的记忆，并连接到自动推导的家谱上，让一家人的味道与往事被留存、被看见、被传承。
 
 ![status](https://img.shields.io/badge/status-prototype-green)
-![platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-blue)
+![platform](https://img.shields.io/badge/platform-Web%20%7C%20PWA-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
+![backend](https://img.shields.io/badge/backend-Supabase%20%7C%20PostgreSQL-brightgreen)
+![ai](https://img.shields.io/badge/AI-%E6%99%BA%E8%B0%B1%20GLM--5.1-purple)
 
 ---
 
@@ -307,134 +308,281 @@
 
 ---
 
-## 技术栈与项目结构
+## 技术栈
 
-> 以下为本仓库的工程组织，可按团队实际情况调整。
+| 层级 | 技术 | 说明 |
+| --- | --- | --- |
+| **数据库** | Supabase PostgreSQL | 托管 Postgres + 内置 Auth + Row Level Security（所有表启用 RLS） |
+| **服务端** | Supabase Edge Functions（Deno / TypeScript） | 无服务器函数，运行时读取 secrets，零冷启动 |
+| **AI 模型** | 智谱 GLM-5.1 | 经 coding 端点（`open.bigmodel.cn/api/coding/paas/v4`），OpenAI 兼容协议 |
+| **前端** | 单页 HTML（JSX + Babel CDN + supabase-js SDK） | 暖米色 + 墨绿、水彩插画风；bottom sheet 交互 |
+| **家谱引擎** | 原生 JavaScript（`src/engine/`） | BFS 最短路径 + 性别路径判堂表 + 农历/阳历比较长幼 |
+| **测试** | Node.js 冒烟脚本（`scripts/smoke.mjs` 等） | service_role key 建测试数据 → 批量断言 → 越权测试 |
+| **部署 CLI** | Supabase CLI v2 | `supabase link` + `supabase functions deploy` + `supabase db push` |
+| **文件存储** | Supabase Storage | 4 桶（avatar / story / capsule / export），各桶独立 RLS |
+| **定时任务** | pg_cron（Supabase 扩展） | 时间胶囊到期前提醒等周期性任务 |
+
+## 项目结构
 
 ```text
-一家食光/
-├── docs/                       # 产品与技术规格
-│   ├── 页面交互清单.md           # 17 个主页面的完整交互定义
-│   ├── 记忆挖掘Agent_对话规格.md  # AI 对话 Skill 人设与策略（含 19+ 边界处理）
-│   └── 家谱关系系统_数据模型.md   # 称谓推导算法与数据模型（堂表/长幼/迁徙）
-├── frontend/                   # 移动端（暖米色 + 墨绿，水彩插画风）
-├── backend/
-│   ├── kinship/                # 家谱关系推导引擎
-│   ├── agent/                  # 记忆挖掘对话服务
-│   └── api/
+一家食光/                              # 实际仓库结构
+├── 一家食光.html                       # ★ 主前端页面（单页应用，JSX + Babel CDN）
+├── supabase/
+│   ├── config.toml                     # Supabase 项目配置
+│   ├── functions/                      # Edge Functions（Deno / TypeScript）
+│   │   ├── ping-ai/                    #   GLM 连通性测试
+│   │   ├── auth-forgot/                #   密保找回与重置密码
+│   │   ├── agent-chat/                 #   ★ AI 记忆挖掘对话 Agent
+│   │   ├── ai-generate/                #   ★ AI 故事生成与插画
+│   │   ├── glm-proxy/                  #   GLM API 统一代理（流式 SSE）
+│   │   └── kinship-rebuild/           #   家谱关系缓存批量重建
+│   └── migrations/                     # 数据库迁移（0001 ~ 0025）
+│       ├── 0001_profiles.sql           #   用户 profiles 表 + RLS
+│       ├── 0002_family.sql             #   家族 / 成员 / 关系 / 称谓缓存表
+│       ├── 0007_relate_claim.sql       #   家谱关系定位 RPC（join_preview / relate / claim）
+│       ├── 0013_phase3_tables.sql      #   味道桌 anchors / comments / hooks
+│       ├── 0014_conversations.sql      #   AI 对话会话表
+│       ├── 0015_stories.sql            #   AI 生成故事表
+│       ├── 0017_capsules.sql           #   时间胶囊表
+│       ├── 0020_storage.sql            #   Storage 桶 + RLS
+│       └── ...                         #   共 25 个迁移文件
+├── src/
+│   ├── engine/                         # 家谱关系推导引擎（4 模块）
+│   │   ├── label-to-edge.js            #   6 种基础关系 → parent_of / spouse_of 边
+│   │   ├── relation-graph.js           #   图结构 + BFS 最短路径
+│   │   ├── kinship-derive.js           #   路径 → 双向中文称呼（含堂表判定）
+│   │   ├── tang-biao.js                #   堂 / 表判定核心算法（父系纯路径检测）
+│   │   └── age-compare.js              #   长幼比较（农历转阳历 + 出生/加入降级）
+│   ├── utils/
+│   │   ├── china-regions.js            #   中国行政区划数据（省 / 市 / 县）
+│   │   ├── date.js                     #   日期工具
+│   │   └── storage.js                  #   本地存储工具
+│   └── ...                             #   前端组件 / 路由 / 状态管理
+├── scripts/                            # 测试脚本（Node.js）
+│   ├── smoke.mjs                       #   冒烟测试（全量回归，每个 Phase 扩展）
+│   ├── test-agent-chat.mjs            #   AI 对话 Agent 端到端测试
+│   ├── test-capsule-autoopen.mjs      #   时间胶囊自动启封测试
+│   ├── test-e2e.mjs                    #   端到端业务流程测试
+│   └── test-generate-story.mjs        #   AI 故事生成测试
+├── 后端开发计划.md                       #   整体路线、schema、分 Phase 任务
+├── 后端开发记录.md                       #   已完成的表/函数/接口/验收证据
+├── 前端开发记录.md                       #   页面交互清单 + 后端接口需求
+├── 家谱关系系统_数据模型与推导规格.md      #   称谓推导算法全文
+├── P30_记忆挖掘Agent_对话Skill规格.md     #   AI 人设与对话策略（含 19+ 边界处理）
+├── 需要补充逻辑_整理版.md                 #   业务规则 / 点亮闭环 / 后端不做清单
+├── 一家食光 设计系统.md                  #   设计系统与视觉规范
+├── uploads/                            # 截图与展示素材
+├── package.json                        # npm 依赖（@supabase/supabase-js）
+├── CLAUDE.md                           # Claude Code 工作纪律
 └── README.md
 ```
 
 **核心技术亮点**
 
-- **记忆挖掘对话** 基于大语言模型，配以精细的人设 System Prompt、时间/地点抽取校验，以及近二十种真实对话场景的边界处理策略。
-- **家谱关系推导** 仅存 `parent_of` / `spouse_of` 两类边，BFS 求最短路径 + 性别路径判定堂表 + 完整出生日期判定长幼，结果写入 `kinship_cache` 双向缓存，关系纠正时级联重推导。
-- **视觉基调**：暖米色 / 米白背景 + 深墨绿主色，水彩插画风；所有弹窗为从底部滑入的 bottom sheet，营造柔和、不打断的体验。
+- **记忆挖掘对话** 基于智谱 GLM-5.1 大语言模型，配以精细的人设 System Prompt、时间/地点抽取校验，以及近二十种真实对话场景的边界处理策略。Agent 以"AI 家人"人设运行，绝不说模板话，一次只问一个问题，永远顺着用户的话往下接。
+- **家谱关系推导** 仅存 `parent_of` / `spouse_of` 两类边，BFS 求最短路径 + 性别路径判定堂表 + 完整出生日期判定长幼，结果写入 `kinship_cache` 表双向缓存。同一动作，每个家人看到属于自己的称呼（堂兄 / 婶婶 / 女儿 …）。关系纠正时级联重推导。
+- **全链路 RLS 安全** 每张表启用 Row Level Security，service_role key 仅存 Edge Function secrets；敏感操作（创建者专属、AI 调用）在 Edge Function 二次校验。
+- **视觉基调**：暖米色 / 米白背景 + 深墨绿主色，水彩插画风；所有弹窗为从底部滑入的 bottom sheet。
 
 ---
 
 ## 安装说明（Installation）
 
-> 以下命令为通用示例，请按团队实际技术栈调整（仓库结构见上一节）。
-
 ### 环境要求
 
 | 依赖 | 版本要求 | 说明 |
 | --- | --- | --- |
-| Node.js | ≥ 18 | 前端与服务端构建 |
-| npm / pnpm / yarn | 任一 | 包管理器 |
-| Python | ≥ 3.10 | 记忆挖掘 Agent 服务（如采用 Python） |
-| 数据库 | MySQL ≥ 8.0 | 存储家谱、记忆、称谓缓存 |
-| LLM API Key | — | 记忆挖掘对话所需（如 Anthropic / OpenAI 等） |
+| Node.js | ≥ 18（实测 v24.13.0） | 运行冒烟脚本 / 安装 Supabase CLI |
+| npm | ≥ 9 | 包管理器（随 Node.js 安装） |
+| Supabase CLI | v2.x | Edge Function 部署 / 数据库迁移（`npm i -g supabase`） |
+| Git | ≥ 2.x | 版本控制 |
+| 浏览器 | Chrome / Safari / Edge 现代版本 | 运行前端页面 |
+| GitHub 账号 | — | 用于 Supabase 第三方登录 |
+| 智谱 API Key | — | AI 对话与故事生成（[open.bigmodel.cn](https://open.bigmodel.cn)） |
+
+> **不需要**本地安装 Python、MySQL 或任何传统后端框架。后端完全基于 Supabase 托管服务。
 
 ### 1. 克隆仓库
 
 ```bash
-git clone https://github.com/<your-org>/yijiashiguang.git
-cd yijiashiguang
+git clone https://github.com/llyn-023/yjsg.git
+cd yjsg
 ```
 
-### 2. 配置环境变量
-
-复制示例配置并填入你的密钥与数据库连接：
+### 2. 安装依赖
 
 ```bash
-cp .env.example .env
-# 编辑 .env，至少填写：
-#   DATABASE_URL=mysql://user:password@localhost:3306/yijiashiguang
-#   LLM_API_KEY=your_api_key_here
-```
-
-### 3. 安装依赖
-
-```bash
-# 前端
-cd frontend
 npm install
-
-# 服务端
-cd ../backend
-npm install          # 若服务端为 Node
-# 或：pip install -r requirements.txt   # 若 agent 服务为 Python
 ```
 
-### 4. 初始化数据库
+> 如果全局未安装 Supabase CLI：`npm install -g supabase`
+
+### 3. 配置 Supabase 项目
+
+**方式 A（推荐）—— 连接已有 Supabase 项目：**
 
 ```bash
-cd backend
-npm run db:migrate    # 建表（family_member / family_relation / kinship_cache 等）
-npm run db:seed       # 可选：导入示例家族数据，便于快速体验
+supabase login          # 用 GitHub 账号登录
+supabase link --project-ref <你的 project_ref>
+```
+
+> 如果暂无 Supabase 项目，在 [supabase.com](https://supabase.com) 免费创建一个，获取 project_ref（URL 中 `https://xxx.supabase.co` 的 `xxx` 部分）。
+
+**方式 B —— 本地开发（Supabase CLI local）：**
+
+```bash
+supabase init
+supabase start          # 启动本地 Supabase 栈（Docker）
+```
+
+### 4. 配置环境变量
+
+```bash
+cp .env.example .env.local
+```
+
+编辑 `.env.local`（已 gitignore，不会提交），填入以下密钥：
+
+```ini
+# Supabase —— 从 Dashboard > Settings > API 获取
+SUPABASE_URL=https://<project_ref>.supabase.co
+SUPABASE_ANON_KEY=eyJ...（公开）
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_...（机密，仅服务端）
+
+# 智谱 GLM —— 从 open.bigmodel.cn 获取
+GLM_API_KEY=your_glm_api_key
+GLM_MODEL=glm-5.1
+GLM_BASE_URL=https://open.bigmodel.cn/api/coding/paas/v4
+```
+
+### 5. 部署 Edge Functions Secrets
+
+```bash
+supabase secrets set GLM_API_KEY=your_glm_api_key
+supabase secrets set GLM_MODEL=glm-5.1
+# GLM_BASE_URL 按需设置，默认为 coding 端点
+```
+
+### 6. 推送数据库迁移
+
+```bash
+# 连接远程数据库并推送所有迁移（0001 ~ 0025）
+supabase db push
+
+# 或在本地开发模式：
+supabase db reset    # 本地：清空并重建全部表
+```
+
+> 迁移文件位于 `supabase/migrations/`，包含建表、RLS 策略、RPC 函数、扩展（pg_cron）等。
+
+### 7. 部署 Edge Functions
+
+```bash
+supabase functions deploy ping-ai          # GLM 连通性测试
+supabase functions deploy auth-forgot      # 密保找回
+supabase functions deploy agent-chat       # AI 记忆挖掘对话
+supabase functions deploy ai-generate      # AI 故事生成
+supabase functions deploy glm-proxy        # GLM 统一代理
+supabase functions deploy kinship-rebuild  # 家谱缓存重建
+```
+
+### 8. 验证连通性
+
+在浏览器中打开 `一家食光.html`，页面右上角应显示 ✅（自动检测 Supabase 连接）。
+
+或用命令行测试：
+
+```bash
+# 测试 GLM 连通
+node scripts/smoke.mjs
+
+# 运行冒烟测试（建测试数据 → 全量断言 → 越权测试 → 清测试数据）
+node scripts/smoke.mjs
 ```
 
 ---
 
 ## 运行指南（Usage / How to Run）
 
-### 本地启动
+### 本地开发
 
-分别启动服务端与前端（建议开两个终端）：
+**前端**（零构建，直接在浏览器打开）：
 
-```bash
-# 终端 1 —— 启动后端（含家谱推导引擎与记忆挖掘 Agent 服务）
-cd backend
-npm run dev           # 默认监听 http://localhost:3000
+```
+本项目的"前端"是一个独立的 HTML 文件，无需构建步骤：
 
-# 终端 2 —— 启动前端
-cd frontend
-npm run dev           # 默认运行在 http://localhost:5173
+→ 用浏览器打开 `一家食光.html` 即可运行
 ```
 
-启动后，在浏览器或移动端模拟器打开前端地址即可访问。
+**后端**（修改 Edge Function 后重新部署）：
+
+```bash
+# 修改某个 Edge Function 后，单独部署
+supabase functions deploy <function-name>
+
+# 数据库变更
+supabase db push
+```
+
+**测试**：
+
+```bash
+# 冒烟测试（全量回归 —— 建数据 → 断言 → 越权 → 清理）
+node scripts/smoke.mjs
+
+# 端到端业务流程测试
+node scripts/test-e2e.mjs
+
+# AI Agent 对话测试
+node scripts/test-agent-chat.mjs
+
+# 时间胶囊自动启封测试
+node scripts/test-capsule-autoopen.mjs
+
+# AI 故事生成测试
+node scripts/test-generate-story.mjs
+```
 
 ### 快速上手（第一次使用）
 
-1. **创建 / 加入家族**：首次进入选择"创建家族"，或用 6 位家族代码"加入家族"。
-2. **定位自己**：从"父亲 / 母亲 / 儿子 / 女儿 / 丈夫 / 妻子"中选一种关系，把自己挂到家谱上，系统会自动推导你与全家的称呼。
-3. **点亮第一道味道**：在味道桌点击中央"＋ → 讲一道味道"，输入菜名，跟着 AI 家人聊下去。
-4. **整理成故事**：对话结束点击"整理成故事"，AI 生成带插画的记忆，挂接到对应家人名下。
-5. **邀请与回声**：把家族代码分享给家人，或"抛个钩子"邀请某位家人来讲一道你想听的菜。
+1. **注册 / 登录**：在页面内完成注册（邮箱 + 密码），或使用已有账号登录。
+2. **创建 / 加入家族**：首次进入选择"创建家族"（系统自动分配 6 位家族代码），或用家人分享的代码"加入家族"。
+3. **定位自己**：从"父亲 / 母亲 / 儿子 / 女儿 / 丈夫 / 妻子"6 种关系中选一种，把自己挂到家谱上，系统自动推导你与全家的双向称呼。
+4. **点亮第一道味道**：在味道桌点击中央"＋ → 讲一道味道"，输入菜名，跟着 AI 家人聊下去。
+5. **整理成故事**：对话结束点击"整理成故事"，AI 生成带插画的记忆，挂接到对应家人名下。
+6. **邀请与回声**：把家族代码分享给家人，或"抛个钩子"邀请某位家人来讲一道你想听的菜。
+
+### Supabase Dashboard 操作
+
+| 操作 | 路径 |
+| --- | --- |
+| 查看数据库 | Dashboard → Table Editor |
+| 执行 SQL | Dashboard → SQL Editor |
+| 管理 Edge Functions | Dashboard → Edge Functions |
+| 设置 Secrets | Dashboard → Edge Functions → 选择函数 → Secrets |
+| 查看 Storage | Dashboard → Storage |
+| 查看 Auth 用户 | Dashboard → Authentication |
+| 查看 API 文档 | Dashboard → Settings → API |
 
 ### 常用脚本
 
 ```bash
-npm run dev        # 开发模式（热更新）
-npm run build      # 生产构建
-npm run start      # 以生产模式运行
-npm run test       # 运行测试（含家谱称谓推导单元测试）
-npm run lint       # 代码检查
+# Supabase
+supabase link                          # 连接远程项目
+supabase functions deploy <name>       # 部署单个 Edge Function
+supabase db push                       # 推送迁移到远程数据库
+supabase db reset                      # 重置本地数据库
+supabase secrets set KEY=VALUE         # 设置 Edge Function 环境变量
+
+# 测试
+node scripts/smoke.mjs                 # 冒烟测试（全量回归）
+node scripts/test-e2e.mjs              # 端到端测试
+
+# 前端
+# 直接浏览器打开 一家食光.html，无需构建/启动命令
 ```
 
-### 构建生产版本
-
-```bash
-# 前端打包
-cd frontend && npm run build
-
-# 后端打包并启动
-cd ../backend && npm run build && npm run start
-```
-
-> 提示：记忆挖掘 Agent 依赖 LLM API，运行前请确认 `.env` 中的 `LLM_API_KEY` 已正确配置，否则对话功能将不可用。
+> 提示：AI 对话功能（记忆挖掘 Agent、故事生成）依赖 GLM API Key。请确认 `supabase secrets list` 中 `GLM_API_KEY` 和 `GLM_MODEL` 已正确配置，否则对话与生成功能将不可用。
 
 ---
 
