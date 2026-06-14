@@ -14,8 +14,8 @@
 
 <p align="center">
   <img src="screenshots/01-welcome.png" alt="一家食光 · 开屏" width="240" />
-   <img width="854" height="1844" alt="3151b0afa27c2c38e204a15ba5d2c64f_720" src="https://github.com/user-attachments/assets/d4d637cb-2c8a-4439-81af-9efca207a22c" />
-    <img src="screenshots/04-family-tree.png" alt="家谱树" width="240" />
+  <img src="https://github.com/user-attachments/assets/d4d637cb-2c8a-4439-81af-9efca207a22c" alt="一家食光 · 味道桌总览" width="240" />
+  <img src="screenshots/04-family-tree.png" alt="家谱树" width="240" />
 </p>
 
 ---
@@ -178,9 +178,6 @@
 
 味道只是钩子。**真正被打捞上来、被留下的，是人，是情。**
 
-<p align="center">
-</p>
-
 ---
 
 ## 一条完整的旅程：从一个名字到一段被留住的时光
@@ -200,8 +197,10 @@
 
 3. **被温柔地问。** AI 没有冷冰冰地索要信息，它说："外婆的红烧肉！这个好——你脑海里第一个冒出来的画面，大概是什么时候、在哪儿的事儿呀？" 小雨说"在外婆家"。AI 知道家谱里记着外婆的籍贯，于是顺势接："外婆家是在扬州那边吧？我记得你家好像是扬州的。"——小雨只需点头。
 
+<p align="center">
   <img src="screenshots/06-ai-chat.png" alt="AI 记忆挖掘对话" width="240" />
-  
+</p>
+
 4. **它懂得在什么时候停下来。** 当小雨打出"外婆走了以后就再也没人做了"，AI 没有追问、没有空洞地安慰，只是轻轻地说："……嗯。有些味道就是跟着人走的。但你还记得，这就够了。"
 
 5. **整理成时光。** 对话结束，AI 把那些零碎的画面，整理成一篇带插画的"记忆瞬间"，端端正正地落在家谱上"外婆"的名下。
@@ -209,15 +208,13 @@
 <p align="center">
   <img src="screenshots/07-story-generating.jpg" alt="AI 正在把碎片串成故事" width="240" />
   <img src="screenshots/08-recipe-detail.png" alt="AI 生成的菜谱与家人的补述" width="240" />
-  <img width="670" height="1448" alt="85504e78fde9891a255a381dca49fcaf_720" src="https://github.com/user-attachments/assets/3020e1d3-6914-48f6-a9f2-cbdea749bd14" />
-
+  <img src="https://github.com/user-attachments/assets/3020e1d3-6914-48f6-a9f2-cbdea749bd14" alt="AI 整理后的记忆时光" width="240" />
 </p>
 
 6. **回声响起。** 妈妈收到提醒——"女儿补充了红烧肉的故事"；而堂兄陈子翔收到的，却是"堂妹补充了红烧肉的故事"。妈妈可以来补上她记得的细节，作为另一个并排的视角。一道原本灰色的、"还有人在等"的菜，就这样被一家人合力点亮了。
 
 <p align="center">
-<img width="871" height="1806" alt="49b46a392f84645918796b2873976324" src="https://github.com/user-attachments/assets/2d339968-b6e3-4c83-b948-a33b22952676" />
-
+  <img src="https://github.com/user-attachments/assets/2d339968-b6e3-4c83-b948-a33b22952676" alt="家庭动态：家里近来怎么样" width="240" />
 </p>
 
 这，就是"食有来处，家有回声"。
@@ -250,9 +247,6 @@
 
 这不是一个技术约束，这是我们对一个正在回忆逝者的人，最基本的体面与温柔。
 
-<p align="center">
-</p>
-
 ---
 
 ## 第二个硬核：用户只"定位"，系统算出整个家族
@@ -269,10 +263,6 @@
 - **堂表不看共同祖先，看血脉路径。** 这是我们重写过一次的核心算法。很多人以为"共同祖先是爷爷就是堂"——错。真正的判定是：**连接两个人的两条路径，是否全程都是"父→子"。** 都是父系才是"堂"；只要有一条经过了女性（姑姑、母亲、姨妈），就是"表"。我们甚至在测试中发现并修正了原型数据里"大伯的儿子被错标成表哥"的常见错误——大伯的儿子，是堂兄。
 - **长幼由完整出生日期决定**，农历会先换算成阳历再比较。而"伯父"和"叔叔"的区别，比的是 **TA 和你父亲** 谁大，不是 TA 和你谁大——这个细节，连很多中国人自己都搞混。
 - **同一个动作，每个人看到的称呼都不一样。** 妈妈补充了一道菜：哥哥收到的是"妈妈补充了…"，堂弟收到的是"婶婶补充了…"，外婆收到的是"女儿补充了…"。每个人都站在自己的视角，看到属于自己的那声称呼。
-
-<p align="center">
-
-</p>
 
 ---
 
@@ -332,6 +322,7 @@
 - 收到的胶囊一旦开启，会**自动转化为自己味道桌上的一道菜**——让一份馈赠，真正落地成为传承。
 
 <p align="center">
+  <img src="screenshots/09-time-capsule.png" alt="时间胶囊" width="240" />
 </p>
 
 ---
