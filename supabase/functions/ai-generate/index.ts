@@ -105,7 +105,21 @@ Generate the story based on this conversation. Fill in ALL fields that have info
   ], 0.3, 4096);
 
   const text = data?.choices?.[0]?.message?.content ?? "";
-  return parseGLMJSON(text);
+  let result = parseGLMJSON(text);
+  // 规范化：确保所有必要字段存在，缺失时填兜底值（对齐 §2.4）
+  if (result) {
+    if (!result.food) result.food = {};
+    if (!result.food.name) result.food.name = "未知";
+    if (!result.scene) result.scene = {};
+    if (!result.scene.era) result.scene.era = "1900";
+    if (!result.scene.location) result.scene.location = {};
+    if (!result.scene.location.city) result.scene.location.city = "未知";
+    if (!result.people) result.people = {};
+    if (!result.emotion) result.emotion = {};
+    if (!result.story_suggestions) result.story_suggestions = {};
+    if (!result.gray_anchor_suggestions) result.gray_anchor_suggestions = [];
+  }
+  return result;
 }
 
 async function generateRecipe(text: string, foodName: string) {
